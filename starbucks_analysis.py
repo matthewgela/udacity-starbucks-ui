@@ -1,0 +1,1 @@
+from starbucks_analysis_app import app
