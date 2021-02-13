@@ -12,26 +12,27 @@ def return_figures():
     # Load data files and process them
     portfolio_path = "data/portfolio.json"
     profile_path = "data/profile.json"
-    # transcript_path = "data/transcript.json"
+    transcript_path = "data/transcript.json"
 
     portfolio = pp.read_data(file_path=portfolio_path, file_type="json")
     profile = pp.read_data(file_path=profile_path, file_type="json")
-    # transcript = pp.read_data(transcript_path)
+    transcript = pp.read_data(file_path=transcript_path, file_type="json")
 
     portfolio_pp = pp.preprocess_data(df=portfolio, data_name="portfolio")
     profile_pp = pp.preprocess_data(df=profile, data_name="profile")
+    transcript_pp = pp.preprocess_data(df=transcript, data_name="transcript")
 
-    # Graph 1 - Difficulty vs Reward
-    graph_one = []
-    x_val = portfolio_pp["difficulty"]
-    y_val = portfolio_pp["reward"]
-    graph_one.append(go.Scatter(x=x_val, y=y_val, mode="markers"))
-
-    layout_one = dict(
-        title="Reward value of offer versus difficulty of redeeming offer",
-        xaxis=dict(title="Difficulty", range=[0, portfolio_pp["difficulty"].max() + 2]),
-        yaxis=dict(title="Reward", range=[0, portfolio_pp["reward"].max() + 2]),
-    )
+    # # Graph 1 - Difficulty vs Reward
+    # graph_one = []
+    # x_val = portfolio_pp["difficulty"]
+    # y_val = portfolio_pp["reward"]
+    # graph_one.append(go.Scatter(x=x_val, y=y_val, mode="markers"))
+    #
+    # layout_one = dict(
+    #     title="Reward value of offer versus difficulty of redeeming offer",
+    #     xaxis=dict(title="Difficulty", range=[0, portfolio_pp["difficulty"].max() + 2]),
+    #     yaxis=dict(title="Reward", range=[0, portfolio_pp["reward"].max() + 2]),
+    # )
 
     # Graph 2 - Showing all attributes per offer
     graph_two = []
@@ -83,17 +84,60 @@ def return_figures():
         yaxis=dict(title="Number of members"),
     )
 
+    # Graph 5 - Events comparison
+
+    events = (
+        transcript_pp["event"]
+        .value_counts()
+        .rename_axis("event")
+        .reset_index(name="counts")
+    )
+    events.sort_values(by="event", inplace=True)
+
+    graph_five = [go.Bar(x=events["event"], y=events["counts"])]
+
+    layout_five = dict(
+        title="Starbucks app activity breakdown",
+        xaxis=dict(
+            title="Event",
+        ),
+        yaxis=dict(title="Number of occurrences"),
+    )
+
     ####################################################################
 
     # append all charts
     figures = []
-    figures.append(dict(data=graph_one, layout=layout_one))
+    # figures.append(dict(data=graph_one, layout=layout_one))
     figures.append(dict(data=graph_two, layout=layout_two))
     figures.append(dict(data=graph_three, layout=layout_three))
     figures.append(dict(data=graph_four, layout=layout_four))
+    figures.append(dict(data=graph_five, layout=layout_five))
 
     return figures
 
 
 if __name__ == "__main__":
     return_figures()
+
+
+# events = (
+#     transcript_pp["event"]
+#         .value_counts()
+#         .rename_axis("event")
+#         .reset_index(name="counts")
+# )
+# events.sort_values(by="event", inplace=True)
+#
+#
+# graph_five = [go.Bar(x=events["event"], y=events["count"])]
+#
+# layout_five = dict(
+#     title="Starbucks app activity breakdown",
+#     xaxis=dict(
+#         title="Event",
+#     ),
+#     yaxis=dict(title="Number of occurrences"),
+# )
+#
+# figures.append(dict(data=graph_five, layout=layout_five))
