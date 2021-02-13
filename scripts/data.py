@@ -14,8 +14,8 @@ def return_figures():
     profile_path = "data/profile.json"
     # transcript_path = "data/transcript.json"
 
-    portfolio = pp.read_data(portfolio_path)
-    profile = pp.read_data(profile_path)
+    portfolio = pp.read_data(file_path=portfolio_path, file_type="json")
+    profile = pp.read_data(file_path=profile_path, file_type="json")
     # transcript = pp.read_data(transcript_path)
 
     portfolio_pp = pp.preprocess_data(df=portfolio, data_name="portfolio")
