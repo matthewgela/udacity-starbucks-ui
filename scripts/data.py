@@ -1,3 +1,4 @@
+import numpy as np
 import plotly.graph_objs as go
 
 import scripts.preprocessing as pp
@@ -37,6 +38,7 @@ def return_figures():
     # Graph 2 - Showing all attributes per offer
     graph_two = []
     col_list = ["reward", "difficulty", "duration"]
+
     for col in col_list:
         graph_two.append(
             go.Bar(
@@ -63,7 +65,17 @@ def return_figures():
     )
     new_members.sort_values(by="year", inplace=True)
 
-    graph_three = [go.Bar(x=new_members["year"], y=new_members["counts"])]
+    color = np.array(["rgb(255,255,255)"] * new_members.shape[0])
+    color[new_members["counts"] < 4000] = "rgb(255,128,0)"
+    color[new_members["counts"] >= 4000] = "rgb(130,0,0)"
+
+    graph_three = [
+        go.Bar(
+            x=new_members["year"],
+            y=new_members["counts"],
+            marker=dict(color=color.tolist()),
+        )
+    ]
 
     layout_three = dict(
         title="Starbucks app new members per year",
@@ -74,7 +86,7 @@ def return_figures():
     )
 
     # Graph 4 - Age distribution
-    graph_four = [go.Histogram(x=profile_pp["age"])]
+    graph_four = [go.Histogram(x=profile_pp["age"], nbinsx=20)]
 
     layout_four = dict(
         title="Age distribution of members",
@@ -94,7 +106,15 @@ def return_figures():
     )
     events.sort_values(by="event", inplace=True)
 
-    graph_five = [go.Bar(x=events["event"], y=events["counts"])]
+    g5_color = np.array(["rgb(255,255,255)"] * events.shape[0])
+    g5_color[events["counts"] < 60000] = "rgb(153,255,153)"
+    g5_color[events["counts"] >= 60000] = "rgb(0,204,0)"
+
+    graph_five = [
+        go.Bar(
+            x=events["event"], y=events["counts"], marker=dict(color=g5_color.tolist())
+        )
+    ]
 
     layout_five = dict(
         title="Starbucks app activity breakdown",
