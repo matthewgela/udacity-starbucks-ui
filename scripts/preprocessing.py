@@ -32,8 +32,16 @@ def preprocess_data(df, data_name):
         df_preprocessed["year_joined"] = df_preprocessed["date_joined"].dt.year
         df_preprocessed.loc[df_preprocessed["age"] == 118, "age"] = np.nan
     elif data_name == "transcript":
-        print("transcript data preprocessing not supported")
-        pass
+        df_preprocessed = pd.concat(
+            [df.drop(["value"], axis=1), pd.DataFrame(df["value"].tolist())], axis=1
+        )
+        df_preprocessed["offer_id"] = np.where(
+            df_preprocessed["offer_id"].isnull(),
+            df_preprocessed["offer id"],
+            df_preprocessed["offer_id"],
+        )
+        if "offer id" in df_preprocessed.columns:
+            df_preprocessed.drop(["offer id"], axis=1, inplace=True)
     else:
         raise ValueError(
             'data_name is not one of "portfolio", "profile", or "transcript"'
@@ -42,8 +50,8 @@ def preprocess_data(df, data_name):
 
 
 if __name__ == "__main__":
-    portfolio = pd.read_json("../data/portfolio.json", orient="records", lines=True)
-    profile = pd.read_json("../data/profile.json", orient="records", lines=True)
-    transcript = pd.read_json("../data/transcript.json", orient="records", lines=True)
+    portfolio = read_data("../data/portfolio.json")
+    profile = read_data("../data/profile.json")
+    transcript = read_data("../data/transcript.json")
     portfolio_pp = preprocess_data(portfolio, data_name="portfolio")
     print(portfolio_pp.iloc[0])
