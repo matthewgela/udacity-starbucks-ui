@@ -3,10 +3,23 @@ import plotly.graph_objs as go
 
 import scripts.preprocessing as pp
 
+
 # TODO - Additional plots
 # Income distribution
 # Age vs Income
 # Gender split
+def return_table():
+    profile_path = "data/profile.json"
+    profile = pp.read_data(file_path=profile_path, file_type="json")
+    profile_pp = pp.preprocess_data(df=profile, data_name="profile")
+    table = profile_pp.dropna(how="any")
+    table["membership number"] = range(len(table))
+    table["membership number"] += 100000
+    table["membership start date"] = table["date_joined"].dt.date
+    table = table.drop(["id", "year_joined", "became_member_on", "date_joined"], axis=1)
+    return table[
+        ["membership number", "gender", "age", "income", "membership start date"]
+    ].head(20)
 
 
 def return_figures():
