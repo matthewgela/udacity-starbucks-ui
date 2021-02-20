@@ -49,7 +49,7 @@ def return_figures():
         )
 
     layout_two = dict(
-        title="Offer attributes (Reward, Difficulty and Duration)",
+        title="Offer details",
         xaxis=dict(
             title="Offer",
         ),
@@ -78,7 +78,7 @@ def return_figures():
     ]
 
     layout_three = dict(
-        title="Starbucks app new members per year",
+        title="Yearly membership growth",
         xaxis=dict(
             title="Year",
         ),
@@ -117,7 +117,7 @@ def return_figures():
     ]
 
     layout_five = dict(
-        title="Starbucks app activity breakdown",
+        title="Offer activity breakdown",
         xaxis=dict(
             title="Event",
         ),
@@ -139,25 +139,3 @@ def return_figures():
 
 if __name__ == "__main__":
     return_figures()
-
-
-# events = (
-#     transcript_pp["event"]
-#         .value_counts()
-#         .rename_axis("event")
-#         .reset_index(name="counts")
-# )
-# events.sort_values(by="event", inplace=True)
-#
-#
-# graph_five = [go.Bar(x=events["event"], y=events["count"])]
-#
-# layout_five = dict(
-#     title="Starbucks app activity breakdown",
-#     xaxis=dict(
-#         title="Event",
-#     ),
-#     yaxis=dict(title="Number of occurrences"),
-# )
-#
-# figures.append(dict(data=graph_five, layout=layout_five))
