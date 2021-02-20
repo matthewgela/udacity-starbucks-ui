@@ -123,18 +123,42 @@ def return_figures():
     g5_color[events["counts"] < 60000] = "rgb(153,255,153)"
     g5_color[events["counts"] >= 60000] = "rgb(0,204,0)"
 
-    graph_five = [
-        go.Bar(
-            x=events["event"], y=events["counts"], marker=dict(color=g5_color.tolist())
-        )
-    ]
+    # graph_five = [
+    #     go.Bar(
+    #         x=events["event"], y=events["counts"], marker=dict(color=g5_color.tolist())
+    #     )
+    # ]
+    #
+    # layout_five = dict(
+    #     title="Offer activity breakdown",
+    #     xaxis=dict(
+    #         title="Event",
+    #     ),
+    #     yaxis=dict(title="Number of occurrences"),
+    # )
 
-    layout_five = dict(
-        title="Offer activity breakdown",
+    # Graph 6 - Cumulative events over time
+    graph_six = []
+    table_six = transcript_pp[["time", "event"]]
+    time_max = table_six["time"].max()
+
+    for event in table_six["event"].unique():
+        single_event = table_six[table_six["event"] == event]
+        event_count = single_event.groupby("time")["event"].count()
+        x_arr = np.array(event_count.index)
+        y_arr = np.cumsum(event_count.values)
+        if time_max != event_count.index.max():
+            x_arr = np.append(x_arr, time_max)
+            y_arr = np.append(y_arr, y_arr[(len(y_arr) - 1)])
+
+        graph_six.append(go.Scatter(x=x_arr, y=y_arr, mode="lines+markers", name=event))
+
+    layout_six = dict(
+        title="Transaction activity over time",
         xaxis=dict(
-            title="Event",
+            title="Time",
         ),
-        yaxis=dict(title="Number of occurrences"),
+        yaxis=dict(title="Event count"),
     )
 
     ####################################################################
@@ -145,7 +169,7 @@ def return_figures():
     figures.append(dict(data=graph_two, layout=layout_two))
     figures.append(dict(data=graph_three, layout=layout_three))
     figures.append(dict(data=graph_four, layout=layout_four))
-    figures.append(dict(data=graph_five, layout=layout_five))
+    figures.append(dict(data=graph_six, layout=layout_six))
 
     return figures
 
