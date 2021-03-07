@@ -12,6 +12,12 @@ model = joblib.load("models/customer_kmeans.joblib")
 
 
 @app.route("/", methods=["POST", "GET"])
+@app.route("/cover", methods=["POST", "GET"])
+def cover():
+    if request.method == "GET":
+        return render_template("cover.html")
+
+
 @app.route("/index", methods=["POST", "GET"])
 def index():
     # PLOTS
