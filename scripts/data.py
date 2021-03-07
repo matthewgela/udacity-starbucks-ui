@@ -38,9 +38,9 @@ def return_table():
     profile = pp.read_data(file_path=profile_path, file_type="json")
     profile_pp = pp.preprocess_data(df=profile, data_name="profile")
     table = profile_pp.dropna(how="any")
-    table["membership number"] = range(len(table))
-    table["membership number"] += 100000
-    table["membership start date"] = table["date_joined"].dt.date
+    table.loc[:, "membership number"] = range(len(table))
+    table.loc[:, "membership number"] += 100000
+    table.loc[:, "membership start date"] = table.loc[:, "date_joined"].dt.date
     table = table.drop(["id", "year_joined", "became_member_on", "date_joined"], axis=1)
     return table[
         ["membership number", "gender", "age", "income", "membership start date"]
@@ -98,8 +98,8 @@ def return_figures():
         new_members.sort_values(by="year", inplace=True)
 
         color = np.array(["rgb(255,255,255)"] * new_members.shape[0])
-        color[new_members["counts"] < 4000] = "rgb(255,128,0)"
-        color[new_members["counts"] >= 4000] = "rgb(130,0,0)"
+        color.loc[new_members["counts"] < 4000] = "rgb(255,128,0)"
+        color.loc[new_members["counts"] >= 4000] = "rgb(130,0,0)"
 
         graph_three = [
             go.Bar(
@@ -139,8 +139,8 @@ def return_figures():
         events.sort_values(by="event", inplace=True)
 
         g5_color = np.array(["rgb(255,255,255)"] * events.shape[0])
-        g5_color[events["counts"] < 60000] = "rgb(153,255,153)"
-        g5_color[events["counts"] >= 60000] = "rgb(0,204,0)"
+        g5_color.loc[events["counts"] < 60000] = "rgb(153,255,153)"
+        g5_color.loc[events["counts"] >= 60000] = "rgb(0,204,0)"
 
         # graph_five = [
         #     go.Bar(

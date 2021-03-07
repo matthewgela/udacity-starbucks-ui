@@ -15,21 +15,23 @@ def read_data(file_path, file_type="json"):
 def preprocess_data(df, data_name):
     if data_name == "portfolio":
         df_explode = df.explode("channels")
-        df_explode["_helper"] = 1
+        df_explode.loc[:, "_helper"] = 1
         df_expanded = df_explode.pivot(index="id", columns="channels", values="_helper")
         df_expanded.fillna(0, inplace=True)
         df_preprocessed = df.merge(
             df_expanded, how="left", left_on="id", right_index=True
         )
-        df_preprocessed["offer name"] = [
+        df_preprocessed.loc[:, "offer name"] = [
             "Offer {}".format(i + 1) for i in range(len(df_preprocessed))
         ]
     elif data_name == "profile":
         df_preprocessed = df.copy()
-        df_preprocessed["date_joined"] = pd.to_datetime(
-            df_preprocessed["became_member_on"], format="%Y%m%d"
+        df_preprocessed.loc[:, "date_joined"] = pd.to_datetime(
+            df_preprocessed.loc[:, "became_member_on"], format="%Y%m%d"
         )
-        df_preprocessed["year_joined"] = df_preprocessed["date_joined"].dt.year
+        df_preprocessed.loc[:, "year_joined"] = df_preprocessed.loc[
+            :, "date_joined"
+        ].dt.year
         df_preprocessed.loc[df_preprocessed["age"] == 118, "age"] = np.nan
     elif data_name == "transcript":
         df_preprocessed = pd.concat(
@@ -54,4 +56,3 @@ if __name__ == "__main__":
     profile = read_data("../data/profile.json")
     transcript = read_data("../data/transcript.json")
     portfolio_pp = preprocess_data(portfolio, data_name="portfolio")
-    print(portfolio_pp.iloc[0])
