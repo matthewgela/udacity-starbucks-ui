@@ -16,6 +16,7 @@
 <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
 
     <style>
+
       .bd-placeholder-img {
         font-size: 1.125rem;
         text-anchor: middle;
@@ -35,7 +36,7 @@
     <!-- Custom styles for this template -->
     <link href="{{ url_for('static', filename='css/cover.css') }}"  rel="stylesheet">
   </head>
-  <body class="d-flex h-100 text-center text-white bg-dark">
+  <body class="d-flex h-100 text-center text-white bg-dark" background = "{{ url_for('static', filename='img/cosmos-1853491_1920.jpg') }}">
     
 <div class="cover-container d-flex w-100 h-100 p-3 mx-auto flex-column">
   <header class="mb-auto">
@@ -50,17 +51,23 @@
   </header>
 
   <main class="px-3">
-    <h1>Abyssinia Analytics</h1>
-    <p class="lead">Understanding our customers better is at the heart of all the analytics we do. Customer analysis, segmentation, and offer recommendations are all available within.</p>
+    <h1>AB Analytics</h1>
+    <p class="lead"> We offer insights into customer data using advanced analytics.
+                      For an interactive exploration of your data,
+                      a segmentation of your customers into groups,
+                      and to generate personalised offer recommendation for your customers, see within.</p>
     <p class="lead">
       <a href="{{ url_for('index') }}" class="btn btn-lg btn-secondary fw-bold border-white bg-white">Enter</a>
     </p>
   </main>
 
   <footer class="mt-auto text-white-50">
-    <p>Made by AB Analytics</p>
+    <p>Made by <a href="https://www.github.com/matthewgela" class="text-white">@matthewgela</a> </p>
   </footer>
 </div>
+
+<div style="background-image: url_for('static', filename='img/linkedinlogo.png');">
+
 
   </body>
 </html>
