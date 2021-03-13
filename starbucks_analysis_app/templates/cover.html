@@ -16,6 +16,7 @@
 <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
 
     <style>
+
       .bd-placeholder-img {
         font-size: 1.125rem;
         text-anchor: middle;
@@ -35,7 +36,7 @@
     <!-- Custom styles for this template -->
     <link href="{{ url_for('static', filename='css/cover.css') }}"  rel="stylesheet">
   </head>
-  <body class="d-flex h-100 text-center text-white bg-dark">
+  <body class="d-flex h-100 text-center text-white bg-dark" background = "{{ url_for('static', filename='img/cosmos-1853491_1920.jpg') }}">
     
 <div class="cover-container d-flex w-100 h-100 p-3 mx-auto flex-column">
   <header class="mb-auto">
@@ -64,6 +65,8 @@
     <p>Made by <a href="https://www.github.com/matthewgela" class="text-white">@matthewgela</a> </p>
   </footer>
 </div>
+
+<div style="background-image: url_for('static', filename='img/linkedinlogo.png');">
 
 
   </body>
