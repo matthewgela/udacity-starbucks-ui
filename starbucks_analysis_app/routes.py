@@ -5,7 +5,7 @@ import pandas as pd
 import plotly
 from flask import render_template, request
 
-from scripts.data import return_figures, return_table
+from scripts.data import customer_group_figures, return_figures, return_table
 from starbucks_analysis_app import app
 
 model = joblib.load("models/customer_kmeans.joblib")
@@ -47,7 +47,17 @@ def index():
 @app.route("/customer", methods=["POST", "GET"])
 def customer():
     if request.method == "GET":
-        return render_template("customer.html")
+        # Generating figures for predicted group
+        figures = customer_group_figures(group=0)
+
+        # plot ids for the html id tag
+        ids = ["figure-{}".format(i + 1) for i, _ in enumerate(figures)]
+
+        # Convert the plotly figures to JSON for javascript in html template
+        figuresJSON = json.dumps(figures, cls=plotly.utils.PlotlyJSONEncoder)
+
+        return render_template("customer.html", ids=ids, figuresJSON=figuresJSON)
+
     if request.method == "POST":
         # Extract the input
         columns = ["gender", "age", "income", "year_joined"]
@@ -58,6 +68,15 @@ def customer():
         )
         # Get the model's prediction
         prediction = model.predict(input_variables)[0]
+
+        # Generating figures for predicted group
+        figures = customer_group_figures(group=prediction)
+
+        # plot ids for the html id tag
+        ids = ["figure-{}".format(i + 1) for i, _ in enumerate(figures)]
+
+        # Convert the plotly figures to JSON for javascript in html template
+        figuresJSON = json.dumps(figures, cls=plotly.utils.PlotlyJSONEncoder)
 
         # So prediction is never zero
         prediction += 1
@@ -73,4 +92,6 @@ def customer():
                 "Year joined": year_joined,
             },
             result=prediction,
+            ids=ids,
+            figuresJSON=figuresJSON,
         )

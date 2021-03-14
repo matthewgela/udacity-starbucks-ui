@@ -79,4 +79,6 @@ df_to_cluster["predicted_cluster"] = pipe_pred
 # Exporting the KMeans Model
 joblib.dump(pipeline, "models/customer_kmeans.joblib")
 
+df_to_cluster.to_csv("data_cache/profile_post_clustering.csv")
+
 print("Done")
