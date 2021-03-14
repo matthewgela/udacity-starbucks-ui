@@ -64,7 +64,7 @@ if elbow_method:
     plt.show()
 
 # Elbow was last found at k = 4
-best_k = 4
+best_k = 5
 
 # Fitting the pipeline
 pipeline = Pipeline(
@@ -75,6 +75,11 @@ pipeline.fit(df_to_cluster)
 # Predictions
 pipe_pred = pipeline.predict(df_to_cluster)
 df_to_cluster["predicted_cluster"] = pipe_pred
+
+for i in range(best_k):
+    df_to_cluster[df_to_cluster["predicted_cluster"] == i].describe(
+        include="all"
+    ).to_csv(f"data_cache/cluster_{i}.csv")
 
 # Exporting the KMeans Model
 joblib.dump(pipeline, "models/customer_kmeans.joblib")
