@@ -109,11 +109,37 @@ def customer_group_figures(group: int = 1):
         df=customer_group_df, income_col="income"
     )
 
+    num_transactions_graph, num_transactions_layout = distribution_plot(
+        df=customer_group_df, col="number_of_transactions"
+    )
+
+    avg_transactions_graph, avg_transactions_layout = distribution_plot(
+        df=customer_group_df, col="average_transaction_value"
+    )
+
+    received_to_viewed_ratio_graph, received_to_viewed_ratio_layout = distribution_plot(
+        df=customer_group_df, col="received-to-viewed-ratio"
+    )
+
+    (
+        received_to_completed_ratio_graph,
+        received_to_completed_ratio_layout,
+    ) = distribution_plot(df=customer_group_df, col="received-to-completed-ratio")
+
     group_figures = [
         dict(data=gender_graph, layout=gender_layout),
         dict(data=age_graph, layout=age_layout),
         dict(data=year_joined_graph, layout=year_joined_layout),
         dict(data=income_graph, layout=income_layout),
+        dict(data=num_transactions_graph, layout=num_transactions_layout),
+        dict(data=avg_transactions_graph, layout=avg_transactions_layout),
+        dict(
+            data=received_to_viewed_ratio_graph, layout=received_to_viewed_ratio_layout
+        ),
+        dict(
+            data=received_to_completed_ratio_graph,
+            layout=received_to_completed_ratio_layout,
+        ),
     ]
 
     return group_figures
@@ -151,6 +177,23 @@ def age_distribution_plot(df: pd.DataFrame, age_col: str = "age"):
         bargap=0.05,  # gap between bars of adjacent location coordinates
     )
     return graph_four, layout_four
+
+
+def distribution_plot(df: pd.DataFrame, col: str = "age", marker_color="#330C73"):
+    # Graph 4 - Age distribution
+    dist_graph = [
+        go.Histogram(x=df[col], nbinsx=20, marker_color=marker_color, opacity=0.75)
+    ]
+
+    dist_layout = dict(
+        title=f"{col} distribution of members",
+        xaxis=dict(
+            title=col,
+        ),
+        yaxis=dict(title="Number of members"),
+        bargap=0.05,  # gap between bars of adjacent location coordinates
+    )
+    return dist_graph, dist_layout
 
 
 def gender_plot(df, gender_col="gender"):
