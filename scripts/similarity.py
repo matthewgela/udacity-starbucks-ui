@@ -22,6 +22,41 @@ def cosine_similarity_custom(df):
     return similarity_matrix_df
 
 
+def similar_offers(
+    user,
+    offer,
+    normalised_user_offer_matrix,
+    item_similarity,
+    mean_offer_rating,
+    top_n=3,
+):
+
+    user_record = normalised_user_offer_matrix.loc[user].dropna()
+    user_offers = user_record.index
+
+    condition = (item_similarity.index.isin(user_offers)) & (
+        item_similarity.index != offer1
+    )
+    offer_col = item_similarity.loc[condition, offer].sort_values(ascending=False)
+    neighbourhood = offer_col[:top_n]
+
+    predicted_rating_df = pd.concat([neighbourhood, user_record], axis=1)
+    predicted_rating_df = predicted_rating_df.dropna(how="any")
+
+    predicted_rating_df.columns = ["similarity", "rating"]
+    predicted_rating_df["prediction_contribution"] = (
+        predicted_rating_df["similarity"] * predicted_rating_df["rating"]
+    )
+
+    prediction = (
+        predicted_rating_df["prediction_contribution"].sum()
+        / predicted_rating_df["similarity"].sum()
+    )
+    prediction += mean_offer_rating.loc[offer]
+
+    return predicted_rating_df, prediction
+
+
 # Cosine similarity
 
 
@@ -46,10 +81,22 @@ if __name__ == "__main__":
 
     user_offer_matrix = offer_completed_ratio.unstack()
 
-    average_offer_response = user_offer_matrix.mean(axis=0, skipna=True)
+    mean_offer_rating = user_offer_matrix.mean(axis=0, skipna=True)
 
-    normalised_user_offer_matrix = user_offer_matrix - average_offer_response
+    normalised_user_offer_matrix = user_offer_matrix - mean_offer_rating
 
     item_similarity = cosine_similarity_custom(normalised_user_offer_matrix)
+
+    offer1 = "ae264e3637204a6fb9bb56bc8210ddfd"
+    user1 = "aa4862eba776480b8bb9c68455b8c2e1"
+
+    neighbourhood, prediction = similar_offers(
+        user1,
+        offer1,
+        normalised_user_offer_matrix,
+        item_similarity,
+        mean_offer_rating,
+        top_n=3,
+    )
 
     print("Done")
