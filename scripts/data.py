@@ -27,7 +27,7 @@ def read_and_preprocess():
             df_path = "data/{}.json".format(file)
             df = pp.read_data(file_path=df_path, file_type="json")
             df_pp = pp.preprocess_data(df=df, data_name=file)
-            df_pp.to_csv("data_cache/{}_pp.csv".format(file))
+            df_pp.to_csv("data_cache/{}_pp.csv".format(file), index=False)
 
         data_file_list.append(df_pp)
 

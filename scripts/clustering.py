@@ -11,6 +11,57 @@ from sklearn.preprocessing import OneHotEncoder, StandardScaler
 import scripts.data as d
 
 
+def prepare_data_for_clustering(profile_pp, transcript_pp):
+    events_binary = pd.get_dummies(transcript_pp["event"])
+    transcript_comb = pd.concat([transcript_pp, events_binary], axis=1)
+
+    # Aggregating to person level
+    # Summing the total number of offers a user has received, viewed and completed
+    user_actions = transcript_comb.groupby(["person"]).agg(
+        num_offer_completed_sum=pd.NamedAgg(column="offer completed", aggfunc="sum"),
+        num_offer_viewed_sum=pd.NamedAgg(column="offer viewed", aggfunc="sum"),
+        num_offer_received_sum=pd.NamedAgg(column="offer received", aggfunc="sum"),
+    )
+    user_actions["received-to-viewed-ratio"] = 100 * (
+        user_actions["num_offer_viewed_sum"] / user_actions["num_offer_received_sum"]
+    )
+    user_actions["received-to-completed-ratio"] = 100 * (
+        user_actions["num_offer_completed_sum"] / user_actions["num_offer_received_sum"]
+    )
+
+    # # Average transaction amount
+    user_transactions_summary = (
+        transcript_comb[transcript_comb["amount"].notnull()]
+        .groupby(["person"])
+        .agg(
+            average_transaction_value=pd.NamedAgg(column="amount", aggfunc=np.mean),
+            number_of_transactions=pd.NamedAgg(column="amount", aggfunc="count"),
+        )
+    )
+
+    # Adding transaction and offer activity aggregated at a user level to the demographic information
+    # we already have to add more information for the clustering algorithm to use
+
+    profile_with_offer_activity = profile_pp.merge(
+        user_actions[["received-to-viewed-ratio", "received-to-completed-ratio"]],
+        how="left",
+        left_on="id",
+        right_index=True,
+    )
+    profile_with_all_activity = profile_with_offer_activity.merge(
+        user_transactions_summary, how="left", left_on="id", right_index=True
+    )
+
+    # Preparing the customer profile data for clustering
+    col_drop_list = ["id", "became_member_on", "date_joined"]
+    profile_with_all_activity = profile_with_all_activity.drop(
+        col_drop_list, axis=1, errors="raise"
+    )
+    df_to_cluster = profile_with_all_activity.dropna(how="any")
+
+    return df_to_cluster
+
+
 def pipeline_preprocessor(df):
     # Setting up the pipeline for KMeans clustering
     numeric_features = df.select_dtypes(include=["int64", "float64"]).columns
@@ -85,7 +136,7 @@ def export_trained_model(model, file_prefix="customer_kmeans"):
 
 
 def export_clustered_data(df, file_prefix="profile_post_clustering"):
-    df.to_csv(f"data_cache/{file_prefix}.csv")
+    df.to_csv(f"data_cache/{file_prefix}.csv", index=False)
 
 
 def output_cluster_summaries(df, cluster_col="predicted_cluster", output_df=True):
@@ -96,12 +147,16 @@ def output_cluster_summaries(df, cluster_col="predicted_cluster", output_df=True
         )
         cluster_summaries.append(summary_df)
         if output_df:
-            summary_df.to_csv(f"data_cache/cluster_{cluster_ind}_summary.csv")
+            summary_df.to_csv(
+                f"data_cache/cluster_{cluster_ind}_summary.csv", index=False
+            )
 
     return cluster_summaries
 
 
 if __name__ == "__main__":
+
+    #  ----------------- Initialising parameters -------------------- #
 
     # Initialising K-Means
     kmeans_kwargs = {
@@ -117,79 +172,15 @@ if __name__ == "__main__":
     # Finding a good choice for the number of clusters, k, to use
     elbow_method = True
 
+    #  ----------------- Loading and preparing data -------------------- #
+
     # Load data files
     portfolio_pp, profile_pp, transcript_pp = d.read_and_preprocess()
 
-    #
-    individual_offers = transcript_pp[["person", "offer_id"]].copy()
-    individual_offers.drop_duplicates()
+    # Prepare data for clustering
+    df_to_cluster = prepare_data_for_clustering(profile_pp, transcript_pp)
 
-    offer_received = transcript_pp[transcript_pp["event"] == "offer received"]
-    events_binary = pd.get_dummies(transcript_pp["event"])
-    transcript_comb = pd.concat([transcript_pp, events_binary], axis=1)
-
-    # t2 = transcript_comb[transcript_comb['person'] == '78afa995795e4d85b5d9ceeca43f5fef']
-
-    t3 = transcript_comb.groupby(["person", "offer_id"]).agg(
-        offer_completed_sum=pd.NamedAgg(column="offer completed", aggfunc="sum"),
-        offer_viewed_sum=pd.NamedAgg(column="offer viewed", aggfunc="sum"),
-        offer_received_sum=pd.NamedAgg(column="offer received", aggfunc="sum"),
-    )
-
-    # Person grouping only
-
-    #
-    t4 = transcript_comb.groupby(["person"]).agg(
-        num_offer_completed_sum=pd.NamedAgg(column="offer completed", aggfunc="sum"),
-        num_offer_viewed_sum=pd.NamedAgg(column="offer viewed", aggfunc="sum"),
-        num_offer_received_sum=pd.NamedAgg(column="offer received", aggfunc="sum"),
-    )
-    t4["received-to-viewed-ratio"] = 100 * (
-        t4["num_offer_viewed_sum"] / t4["num_offer_received_sum"]
-    )
-    t4["received-to-completed-ratio"] = 100 * (
-        t4["num_offer_completed_sum"] / t4["num_offer_received_sum"]
-    )
-
-    # # Average transaction amount
-    t5 = (
-        transcript_comb[transcript_comb["amount"].notnull()]
-        .groupby(["person"])
-        .agg(
-            average_transaction_value=pd.NamedAgg(column="amount", aggfunc=np.mean),
-            number_of_transactions=pd.NamedAgg(column="amount", aggfunc="count"),
-        )
-    )
-
-    profile_with_activity_1 = profile_pp.merge(
-        t4[["received-to-viewed-ratio", "received-to-completed-ratio"]],
-        how="left",
-        left_on="id",
-        right_index=True,
-    )
-    profile_with_activity_2 = profile_with_activity_1.merge(
-        t5, how="left", left_on="id", right_index=True
-    )
-
-    # fill_list = ['average_transaction_value', 'received-to-viewed-ratio', 'received-to-completed-ratio']
-    # for col in fill_list:
-    #     profile_with_activity_2[col].fillna(0, inplace=True)
-
-    # merge1 = individual_offers.merge(, how='left',
-    #                         on='offer_id')
-
-    # Preparing the customer profile data for clustering
-    select_columns = [
-        "gender",
-        "age",
-        "income",
-        "year_joined",
-        "average_transaction_value",
-        "number_of_transactions",
-        "received-to-viewed-ratio",
-        "received-to-completed-ratio",
-    ]
-    df_to_cluster = profile_with_activity_2[select_columns].dropna(how="any")
+    #  ----------------- Machine Learning begins here ------------------- #
 
     # Creating the pipeline for training
     preprocessor = pipeline_preprocessor(df_to_cluster)
