@@ -4,11 +4,11 @@ import pandas as pd
 # Module to pre-process the Starbucks datasets
 
 
-def read_data(file_path, file_type="json"):
+def read_data(file_path, file_type="json", index_col=None):
     if file_type == "json":
         df = pd.read_json(file_path, orient="records", lines=True)
     elif file_type == "csv":
-        df = pd.read_csv(file_path)
+        df = pd.read_csv(file_path, index_col=index_col)
     return df
 
 

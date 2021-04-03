@@ -60,12 +60,20 @@ def customer():
 
     if request.method == "POST":
         # Extract the input
-        columns = ["gender", "age", "income", "year_joined"]
-        gender, age, income, year_joined = [request.form[col] for col in columns]
+        columns = [
+            "gender",
+            "age",
+            "income",
+            "year_joined",
+            "average_transaction_value",
+            "number_of_transactions",
+            "received-to-viewed-ratio",
+            "received-to-completed-ratio",
+        ]
+
+        form_values = [request.form[col] for col in columns]
         # Make DataFrame for model
-        input_variables = pd.DataFrame(
-            [[gender, age, income, year_joined]], columns=columns
-        )
+        input_variables = pd.DataFrame([form_values], columns=columns)
         # Get the model's prediction
         prediction = model.predict(input_variables)[0]
 
@@ -85,12 +93,7 @@ def customer():
         # of the values they input before
         return render_template(
             "customer.html",
-            original_input={
-                "Gender": gender,
-                "Age": age,
-                "Income": income,
-                "Year joined": year_joined,
-            },
+            original_input=dict(zip(columns, form_values)),
             result=prediction,
             ids=ids,
             figuresJSON=figuresJSON,
