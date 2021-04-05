@@ -70,7 +70,7 @@ def customer():
             "received-to-viewed-ratio",
             "received-to-completed-ratio",
         ]
-
+        print("customer form", request.form)
         form_values = [request.form[col] for col in columns]
         # Make DataFrame for model
         input_variables = pd.DataFrame([form_values], columns=columns)
@@ -97,4 +97,43 @@ def customer():
             result=prediction,
             ids=ids,
             figuresJSON=figuresJSON,
+        )
+
+
+@app.route("/recommendation", methods=["POST", "GET"])
+def recommendation():
+    # PLOTS
+    figures = return_figures()
+
+    # plot ids for the html id tag
+    ids = ["figure-{}".format(i + 1) for i, _ in enumerate(figures)]
+
+    # Convert the plotly figures to JSON for javascript in html template
+    figuresJSON = json.dumps(figures, cls=plotly.utils.PlotlyJSONEncoder)
+
+    # TABLE
+    df = return_table()
+
+    if request.method == "GET":
+        return render_template(
+            "recommendation.html",
+            ids=ids,
+            figuresJSON=figuresJSON,
+            column_names=df.columns.values,
+            row_data=list(df.values.tolist()),
+            # link_column="person",
+            zip=zip,
+        )
+
+    if request.method == "POST":
+        data = request.form
+        print(data)
+        return render_template(
+            "recommendation.html",
+            ids=ids,
+            figuresJSON=figuresJSON,
+            column_names=df.columns.values,
+            row_data=list(df.values.tolist()),
+            # link_column="person",
+            zip=zip,
         )
