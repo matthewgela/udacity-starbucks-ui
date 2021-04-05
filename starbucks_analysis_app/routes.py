@@ -29,18 +29,11 @@ def index():
     # Convert the plotly figures to JSON for javascript in html template
     figuresJSON = json.dumps(figures, cls=plotly.utils.PlotlyJSONEncoder)
 
-    # TABLE
-    df = return_table()
-
     if request.method == "GET":
         return render_template(
             "index.html",
             ids=ids,
             figuresJSON=figuresJSON,
-            column_names=df.columns.values,
-            row_data=list(df.values.tolist()),
-            # link_column="person",
-            zip=zip,
         )
 
 
