@@ -45,7 +45,7 @@ def return_table():
     table = table.drop(["id", "year_joined", "became_member_on", "date_joined"], axis=1)
     return table[
         ["membership number", "gender", "age", "income", "membership start date"]
-    ].head(20)
+    ]
 
 
 def return_figures():
