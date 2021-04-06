@@ -5,7 +5,7 @@ import pandas as pd
 import plotly
 from flask import render_template, request
 
-from scripts.data import customer_group_figures, return_figures, return_table
+from scripts.data import customer_group_figures, return_figures
 from starbucks_analysis_app import app
 
 model = joblib.load("models/customer_kmeans.joblib")
@@ -104,18 +104,11 @@ def recommendation():
     # Convert the plotly figures to JSON for javascript in html template
     figuresJSON = json.dumps(figures, cls=plotly.utils.PlotlyJSONEncoder)
 
-    # TABLE
-    df = return_table()
-
     if request.method == "GET":
         return render_template(
             "recommendation.html",
             ids=ids,
             figuresJSON=figuresJSON,
-            column_names=df.columns.values,
-            row_data=list(df.values.tolist()),
-            # link_column="person",
-            zip=zip,
         )
 
     if request.method == "POST":
@@ -125,8 +118,4 @@ def recommendation():
             "recommendation.html",
             ids=ids,
             figuresJSON=figuresJSON,
-            column_names=df.columns.values,
-            row_data=list(df.values.tolist()),
-            # link_column="person",
-            zip=zip,
         )
