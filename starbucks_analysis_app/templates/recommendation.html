@@ -22,6 +22,10 @@
       <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.5.2/css/bootstrap.css" />
 <!--      <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.10.24/css/dataTables.bootstrap4.min.css" />-->
 
+<!--      <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/v/dt/dt-1.10.24/datatables.min.css"/>-->
+
+<!--        <script type="text/javascript" src="https://cdn.datatables.net/v/dt/dt-1.10.24/datatables.min.js"></script>-->
+
 
     <!-- Bootstrap core CSS -->
     <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
@@ -149,31 +153,23 @@
                 <fieldset>
                     <form action="" class="form-group" method="post">
                         <div class="table-responsive">
+                            <div id="data-container" class="hidden">
                             <div class="table-responsive">
 
                                 <table id="escalation" class="table table-striped table-bordered table-hover" cellspacing="0" width="100%">
                                     <thead class="thead-dark">
                                         <tr id="headings-row">
-                                            {% for col in column_names %}
-                                              <th class="headings-data">{{col}}</th>
-                                              {% endfor %}
-                                            <th>Submit</th>
+                                            <th>Membership no.</th>
+                                            <th>Gender</th>
+                                            <th>Age</th>
+                                            <th>Income</th>
+                                            <th>Date</th>
                                         </tr>
                                     </thead>
-                                    <tbody>
-                                        {% for row in row_data %}
-                                        <tr class='clickable-row' id = "{{loop.index}}">
-                                            {% for col, row_ in zip(column_names, row) %}
-                                              <td class="row-data">{{row_}}</td>
-                                              {% endfor %}
-                                            <td><input type="button"
-                                               value="Best offer"
-                                               onclick="show()" /></td>
-                                        </tr>
-                                    {% endfor %}
-                                    </tbody>
+<!--                                    The body is filled in using the ajax script which pulls data from a json file (for faster rendering -->
                                 </table>
                             </div>
+                        </div>
                         </div>
                     </form>            <!--END OF FORM ^^-->
                 </fieldset>
@@ -196,41 +192,30 @@
   </body>
 
 <footer>
-    <script type="text/javascript">
-        function show() {
-           var rowId =
-               event.target.parentNode.parentNode.id;
-          //this gives id of tr whose button was clicked
-           var data =
-            document.getElementById(rowId).querySelectorAll(".row-data");
-          /*returns array of all elements with
-          "row-data" class within the row with given id*/
-
-          var headings =
-          document.getElementById("headings-row").querySelectorAll(".headings-data")
-
-          alert("Calculating recommendations for " + headings[0].innerHTML + ":" + data[0].innerHTML);
-
-          var formData = new FormData();
-            var i;
-            for (i = 0; i < data.length; i++){
-                var val = data[i].innerHTML
-                var index = headings[i].innerHTML
-                formData.append(index, val)
-            }
-
-            var request = new XMLHttpRequest();
-            request.open("POST", "{{ url_for('recommendation') }}");
-            request.send(formData);
-        }
-
-    </script>
 
     <script type="text/javascript">
         $(document).ready(function(){
-            $('#escalation').dataTable();
+            table = $('#escalation').DataTable({
+            "ajax": 'static/js/customer_data_table.json',
+            "deferRender": true
+            });
+
+            $('#escalation tbody').on('click', 'tr', function () {
+                var data = table.row( this ).data();
+                alert('Generating recommendations for member no. '+data[3]+' ');
+
+                var formData = new FormData();
+                formData.append("id", data[3])
+                var request = new XMLHttpRequest();
+                request.open("POST", "{{ url_for('recommendation') }}");
+                request.send(formData);
+            } );
+
+
+
         });
     </script>
+
 
 </footer>
 

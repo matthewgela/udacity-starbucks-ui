@@ -43,6 +43,20 @@ def return_table():
     table.loc[:, "membership number"] += 100000
     table.loc[:, "membership start date"] = table.loc[:, "date_joined"].dt.date
     table = table.drop(["id", "year_joined", "became_member_on", "date_joined"], axis=1)
+
+    table["membership start date"] = pd.to_datetime(
+        table["membership start date"]
+    ).dt.strftime("%Y-%m-%d")
+
+    table = table[
+        ["membership number", "gender", "age", "income", "membership start date"]
+    ]
+
+    # TODO - change location of data file
+    table.to_json(
+        "starbucks_analysis_app/static/js/customer_data_table.json", orient="split"
+    )
+
     return table[
         ["membership number", "gender", "age", "income", "membership start date"]
     ]
@@ -311,4 +325,5 @@ def offer_attributes_plot(
 
 
 if __name__ == "__main__":
-    return_figures()
+    # return_figures()
+    return_table()
