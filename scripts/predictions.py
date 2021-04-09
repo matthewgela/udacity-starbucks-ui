@@ -2,8 +2,9 @@ import os
 from typing import Dict
 
 import pandas as pd
-import preprocessing as pp
-from similarity import compute_similarities
+
+import scripts.preprocessing as pp
+from scripts.similarity import compute_similarities
 
 
 def compute_similar_offers(
@@ -29,16 +30,15 @@ def compute_similar_offers(
     return similar_offers_df
 
 
-def compute_predicted_rating(offer, similar_offers_df, mean_rating):
+def compute_predicted_rating(user, offer, similar_offers_df, mean_rating):
     similar_offers_df["prediction_contribution"] = (
         similar_offers_df["similarity"] * similar_offers_df["rating"]
     )
-
     predicted_rating = (
         similar_offers_df["prediction_contribution"].sum()
         / similar_offers_df["similarity"].sum()
     )
-    predicted_rating += mean_rating.loc[offer]
+    predicted_rating += mean_rating.loc[user]
 
     return predicted_rating
 
@@ -52,7 +52,12 @@ def compute_all_ratings_for_user(
     not_rated_offers = [offer for offer in all_offers if offer not in rated_offers]
 
     user_ratings_with_predictions = user_ratings.copy()
+    user_ratings_with_predictions += mean_rating.loc[user].values[0]
+
+    print(user_ratings_with_predictions)
+
     for offer in not_rated_offers:
+        print("offer: ", offer)
         similar_offers = compute_similar_offers(
             user=user,
             offer=offer,
@@ -62,17 +67,25 @@ def compute_all_ratings_for_user(
         )
 
         prediction_rating = compute_predicted_rating(
-            offer=offer, similar_offers_df=similar_offers, mean_rating=mean_rating
+            user=user,
+            offer=offer,
+            similar_offers_df=similar_offers,
+            mean_rating=mean_rating,
         )
 
         user_ratings_with_predictions[offer] = prediction_rating
-        print(user_ratings_with_predictions)
+
+    print(user_ratings_with_predictions)
 
     return user_ratings_with_predictions
 
 
-if __name__ == "__main__":
-    user1 = "0009655768c64bdeb2e877511632db8f"
+def generate_prediction(user, perform_mapping=False):
+    if perform_mapping:
+        id_mapping_table = pd.read_csv("data_cache/customer_id_mapping.csv")
+        user = id_mapping_table.loc[
+            id_mapping_table["membership number"] == int(user), "id"
+        ].values[0]
 
     item_locations: Dict[str, str] = {
         "similarity_matrix": "data_cache/similarity_matrix.csv",
@@ -97,10 +110,19 @@ if __name__ == "__main__":
         print(f"{key} loaded from cache")
 
     user_ratings = compute_all_ratings_for_user(
-        user=user1,
+        user=user,
         user_offer_matrix=load_items["normalised_user_offer_matrix"],
         mean_rating=load_items["mean_rating"],
         similarity_matrix=load_items["similarity_matrix"],
     )
 
-    print(user_ratings)
+    ratings_table = pd.DataFrame(
+        dict(offer=user_ratings.index, rating=user_ratings.values)
+    )
+
+    return ratings_table.sort_values(by="rating", ascending=False)
+
+
+if __name__ == "__main__":
+    user1 = "100000"
+    user_ratings1 = generate_prediction(user1, perform_mapping=True)
