@@ -43,9 +43,9 @@ def compute_similarities():
 
     user_offer_matrix = offer_completed_ratio.unstack()
 
-    mean_offer_rating = user_offer_matrix.mean(axis=0, skipna=True)
+    mean_offer_rating = user_offer_matrix.mean(axis=1, skipna=True)
 
-    normalised_user_offer_matrix = user_offer_matrix - mean_offer_rating
+    normalised_user_offer_matrix = user_offer_matrix.sub(mean_offer_rating, axis="rows")
 
     item_similarity = compute_similarity_matrix(
         df=normalised_user_offer_matrix, method="cosine"

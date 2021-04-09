@@ -6,6 +6,7 @@ import plotly
 from flask import render_template, request
 
 from scripts.data import customer_group_figures, return_figures
+from scripts.predictions import generate_prediction
 from starbucks_analysis_app import app
 
 model = joblib.load("models/customer_kmeans.joblib")
@@ -95,27 +96,30 @@ def customer():
 
 @app.route("/recommendation", methods=["POST", "GET"])
 def recommendation():
-    # PLOTS
-    figures = return_figures()
+    ratings_table = generate_prediction(user="100000", perform_mapping=True)
 
-    # plot ids for the html id tag
-    ids = ["figure-{}".format(i + 1) for i, _ in enumerate(figures)]
-
-    # Convert the plotly figures to JSON for javascript in html template
-    figuresJSON = json.dumps(figures, cls=plotly.utils.PlotlyJSONEncoder)
-
+    # Render page
     if request.method == "GET":
         return render_template(
             "recommendation.html",
-            ids=ids,
-            figuresJSON=figuresJSON,
+            column_names=ratings_table.columns.values,
+            row_data=list(ratings_table.values.tolist()),
+            zip=zip,
         )
 
     if request.method == "POST":
+
         data = request.form
         print(data)
+
+        # Generate recommendation
+        ratings_table = generate_prediction(user=data["id"], perform_mapping=True)
+
+        # return data['id']
         return render_template(
-            "recommendation.html",
-            ids=ids,
-            figuresJSON=figuresJSON,
+            template_name_or_list="recommendation.html",
+            column_names_selected=ratings_table.columns.values,
+            row_data_selected=list(ratings_table.values.tolist()),
+            zip=zip,
+            selected=data["id"],
         )

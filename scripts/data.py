@@ -42,12 +42,15 @@ def return_table():
     table.loc[:, "membership number"] = range(len(table))
     table.loc[:, "membership number"] += 100000
     table.loc[:, "membership start date"] = table.loc[:, "date_joined"].dt.date
-    table = table.drop(["id", "year_joined", "became_member_on", "date_joined"], axis=1)
+
+    id_mapping = table[["id", "membership number"]]
+    id_mapping.to_csv("data_cache/customer_id_mapping.csv", index=False)
 
     table["membership start date"] = pd.to_datetime(
         table["membership start date"]
     ).dt.strftime("%Y-%m-%d")
 
+    table = table.drop(["id", "year_joined", "became_member_on", "date_joined"], axis=1)
     table = table[
         ["membership number", "gender", "age", "income", "membership start date"]
     ]
