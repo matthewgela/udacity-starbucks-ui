@@ -154,11 +154,12 @@ def generate_prediction(user, perform_mapping=False):
         "Customer Ratings",
         "Ratings with predictions",
     ]
+    ratings_table_display_table = ratings_table_display_table.round(decimals=2)
     ratings_table_display_table.fillna("-", inplace=True)
 
-    return ratings_table_display_table.round(decimals=2)
+    return ratings_table_display_table
 
 
 if __name__ == "__main__":
-    user1 = "100002"
+    user1 = "100006"
     user_ratings1 = generate_prediction(user1, perform_mapping=True)
