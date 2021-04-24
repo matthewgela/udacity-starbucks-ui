@@ -43,6 +43,15 @@ def compute_similarities():
 
     user_offer_matrix = offer_completed_ratio.unstack()
 
+    drop_list = []
+    for col in user_offer_matrix.columns:
+        cond = (user_offer_matrix[col].isin([np.nan, 0])).all()
+        print(cond)
+        if cond:
+            drop_list.append(col)
+            print(col)
+    user_offer_matrix = user_offer_matrix.drop(drop_list, axis=1)
+
     mean_offer_rating = user_offer_matrix.mean(axis=1, skipna=True)
 
     normalised_user_offer_matrix = user_offer_matrix.sub(mean_offer_rating, axis="rows")

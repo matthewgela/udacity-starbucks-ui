@@ -115,6 +115,12 @@ def recommendation():
         # Generate recommendation
         ratings_table = generate_prediction(user=data["id"], perform_mapping=True)
 
+        top_3_predictions = list(
+            ratings_table[ratings_table["Customer Ratings"] == "-"]["Offer name"][
+                :3
+            ].values
+        )
+
         # return data['id']
         return render_template(
             template_name_or_list="recommendation.html",
@@ -122,4 +128,5 @@ def recommendation():
             row_data_selected=list(ratings_table.values.tolist()),
             zip=zip,
             selected=data["id"],
+            recommended_offers=top_3_predictions,
         )

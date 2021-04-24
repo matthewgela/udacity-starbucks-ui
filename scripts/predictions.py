@@ -51,10 +51,9 @@ def compute_all_ratings_for_user(
     rated_offers = user_ratings.copy().dropna().index
     not_rated_offers = [offer for offer in all_offers if offer not in rated_offers]
 
-    user_ratings_with_predictions = user_ratings.copy()
-    user_ratings_with_predictions += mean_rating.loc[user].values[0]
-
-    print(user_ratings_with_predictions)
+    user_ratings_pre = user_ratings.copy()
+    user_ratings_pre += mean_rating.loc[user].values[0]
+    user_ratings_with_predictions = user_ratings_pre.copy()
 
     for offer in not_rated_offers:
         print("offer: ", offer)
@@ -74,10 +73,9 @@ def compute_all_ratings_for_user(
         )
 
         user_ratings_with_predictions[offer] = prediction_rating
-
     print(user_ratings_with_predictions)
 
-    return user_ratings_with_predictions
+    return user_ratings_pre, user_ratings_with_predictions
 
 
 def generate_prediction(user, perform_mapping=False):
@@ -91,6 +89,7 @@ def generate_prediction(user, perform_mapping=False):
         "similarity_matrix": "data_cache/similarity_matrix.csv",
         "normalised_user_offer_matrix": "data_cache/normalised_user_offer_matrix.csv",
         "mean_rating": "data_cache/mean_rating.csv",
+        "offer_portfolio": "data_cache/portfolio_pp.csv",
     }
 
     load_items = dict()
@@ -106,10 +105,15 @@ def generate_prediction(user, perform_mapping=False):
             break
 
     for key, value in item_locations.items():
-        load_items[key] = pp.read_data(file_path=value, file_type="csv", index_col=0)
+        file_extension = os.path.splitext(value)[1]
+        load_items[key] = pp.read_data(
+            file_path=value,
+            file_type=file_extension,
+            index_col=None if key == "offer_portfolio" else 0,
+        )
         print(f"{key} loaded from cache")
 
-    user_ratings = compute_all_ratings_for_user(
+    user_ratings_pre, user_ratings_post = compute_all_ratings_for_user(
         user=user,
         user_offer_matrix=load_items["normalised_user_offer_matrix"],
         mean_rating=load_items["mean_rating"],
@@ -117,12 +121,45 @@ def generate_prediction(user, perform_mapping=False):
     )
 
     ratings_table = pd.DataFrame(
-        dict(offer=user_ratings.index, rating=user_ratings.values)
+        dict(
+            {
+                "Offer": user_ratings_pre.index,
+                "Ratings": user_ratings_pre.values,
+                "Ratings with predictions": user_ratings_post.values,
+            }
+        )
     )
 
-    return ratings_table.sort_values(by="rating", ascending=False)
+    ratings_table_full = ratings_table.merge(
+        load_items["offer_portfolio"], how="left", left_on="Offer", right_on="id"
+    )
+    ratings_table_display_table = ratings_table_full[
+        [
+            "offer name",
+            "offer_type",
+            "difficulty",
+            "reward",
+            "Ratings",
+            "Ratings with predictions",
+        ]
+    ]
+    ratings_table_display_table = ratings_table_display_table.sort_values(
+        by=["Ratings with predictions", "Ratings"], ascending=False
+    )
+    ratings_table_display_table.columns = [
+        "Offer name",
+        "Offer type",
+        "Customer spend value (£)",
+        "Customer reward value (£)",
+        "Customer Ratings",
+        "Ratings with predictions",
+    ]
+    ratings_table_display_table = ratings_table_display_table.round(decimals=2)
+    ratings_table_display_table.fillna("-", inplace=True)
+
+    return ratings_table_display_table
 
 
 if __name__ == "__main__":
-    user1 = "100000"
+    user1 = "100006"
     user_ratings1 = generate_prediction(user1, perform_mapping=True)

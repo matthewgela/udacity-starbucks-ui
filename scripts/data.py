@@ -329,4 +329,5 @@ def offer_attributes_plot(
 
 if __name__ == "__main__":
     # return_figures()
-    return_table()
+    # return_table()
+    read_and_preprocess()

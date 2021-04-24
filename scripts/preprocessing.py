@@ -5,9 +5,9 @@ import pandas as pd
 
 
 def read_data(file_path, file_type="json", index_col=None):
-    if file_type == "json":
+    if (file_type == "json") or (file_type == ".json"):
         df = pd.read_json(file_path, orient="records", lines=True)
-    elif file_type == "csv":
+    elif (file_type == "csv") or (file_type == ".csv"):
         df = pd.read_csv(file_path, index_col=index_col)
     return df
 
