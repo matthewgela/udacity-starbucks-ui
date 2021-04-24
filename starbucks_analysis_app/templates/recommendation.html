@@ -181,7 +181,7 @@
 
     {%if selected %}
     <div class="row mb-3 pb-3 mt-3 pt-3 border-bottom border-top text-center">
-    <div class="col-6 border-right br-3">
+    <div class="col-7 border-right br-3">
         <div>
             <h5>Ratings table for customer
             {% if selected %}
@@ -234,27 +234,20 @@
 
     </div>
 
-      <div class="col-6">
+      <div class="col-5">
           <div>
               <h5>Results</h5>
           </div>
           <div class="result" align="left">
-            {% if result %}
-              <p style="font-size:15px">The customer details provided were:
+            {% if selected %}
+              <p style="font-size:15px">The top 3 best recommendations for new offers to provide to this customer, in order, are
               <br>
               <br>
-                {% for variable, value in original_input.items() %}
-                    <b>{{ variable }}</b> : {{ value }}
+                {% for offer in recommended_offers %}
+                    {{ offer }}
                     <br>
                 {% endfor %}
-
-                <br> We have run the profile above through our clustering algorithm, and have
-                    determined that the segment that that this individual belongs to is group
-              <b> {{result}}.</b>
-                  <br>
-                  <br>
-              Please see the below in order to explore the summary statistics of the group the customer has been matched with.
-            </p>
+              <p>Please note the offers are recommended are those not already seen by the customer.</p>
             {% endif %}
         </div>
       </div>
