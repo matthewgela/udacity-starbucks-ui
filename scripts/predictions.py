@@ -1,10 +1,7 @@
-import os
-from typing import Dict
-
 import pandas as pd
 
 import scripts.preprocessing as pp
-from scripts.similarity import compute_similarities
+from scripts.recommender import CollaborativeFiltering, create_user_offer_matrix
 
 
 def compute_similar_offers(
@@ -78,60 +75,23 @@ def compute_all_ratings_for_user(
     return user_ratings_pre, user_ratings_with_predictions
 
 
-def generate_prediction(user, perform_mapping=False):
+def generate_prediction(user, recommender, num_recs, perform_mapping=False):
     if perform_mapping:
         id_mapping_table = pd.read_csv("data_cache/customer_id_mapping.csv")
         user = id_mapping_table.loc[
             id_mapping_table["membership number"] == int(user), "id"
         ].values[0]
 
-    item_locations: Dict[str, str] = {
-        "similarity_matrix": "data_cache/similarity_matrix.csv",
-        "normalised_user_offer_matrix": "data_cache/normalised_user_offer_matrix.csv",
-        "mean_rating": "data_cache/mean_rating.csv",
-        "offer_portfolio": "data_cache/portfolio_pp.csv",
-    }
-
-    load_items = dict()
-    for val in item_locations.values():
-        if not os.path.isfile(val):
-            compute_similarities()
-            if os.path.isfile(val):
-                print(f"file {val} exists after computing similarities")
-            else:
-                print(
-                    f"file {val} doesn't exist after computing similarities, investigate"
-                )
-            break
-
-    for key, value in item_locations.items():
-        file_extension = os.path.splitext(value)[1]
-        load_items[key] = pp.read_data(
-            file_path=value,
-            file_type=file_extension,
-            index_col=None if key == "offer_portfolio" else 0,
-        )
-        print(f"{key} loaded from cache")
-
-    user_ratings_pre, user_ratings_post = compute_all_ratings_for_user(
-        user=user,
-        user_offer_matrix=load_items["normalised_user_offer_matrix"],
-        mean_rating=load_items["mean_rating"],
-        similarity_matrix=load_items["similarity_matrix"],
+    ratings_table = recommender.recommend_for_user(
+        user, num_recs, return_all_ratings=True
     )
 
-    ratings_table = pd.DataFrame(
-        dict(
-            {
-                "Offer": user_ratings_pre.index,
-                "Ratings": user_ratings_pre.values,
-                "Ratings with predictions": user_ratings_post.values,
-            }
-        )
+    offer_portfolio = pp.read_data(
+        file_path="data_cache/portfolio_pp.csv", file_type=".csv", index_col=None
     )
 
     ratings_table_full = ratings_table.merge(
-        load_items["offer_portfolio"], how="left", left_on="Offer", right_on="id"
+        offer_portfolio, how="left", left_on="Offer", right_on="id"
     )
     ratings_table_display_table = ratings_table_full[
         [
@@ -162,4 +122,13 @@ def generate_prediction(user, perform_mapping=False):
 
 if __name__ == "__main__":
     user1 = "100006"
-    user_ratings1 = generate_prediction(user1, perform_mapping=True)
+
+    # Train recommender model
+    user_offer_matrix = create_user_offer_matrix()
+    cf_recommender = CollaborativeFiltering(top_k=3, basis="item")
+    cf_recommender.train(user_offer_matrix)
+
+    user_ratings1 = generate_prediction(
+        user=user1, recommender=cf_recommender, num_recs=3, perform_mapping=True
+    )
+    print("Done!")
