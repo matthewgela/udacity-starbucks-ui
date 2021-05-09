@@ -72,13 +72,7 @@ class CollaborativeFiltering:
 
     def train(self, user_offer_matrix):
         self.user_offer_matrix = user_offer_matrix
-        self.mean_ratings = create_mean_rating(user_offer_matrix)
-        self.normalised_user_offer_matrix = normalise_user_offer_matrix(
-            self.user_offer_matrix, self.mean_ratings
-        )
-        self.similarity_matrix = self._compute_similarity(
-            self.normalised_user_offer_matrix
-        )
+        self.similarity_matrix = self._compute_similarity(self.user_offer_matrix)
 
     def _compute_similar_offers(
         self,
@@ -103,7 +97,7 @@ class CollaborativeFiltering:
 
         return similar_offers_df
 
-    def _compute_predicted_rating(self, user, similar_offers_df, mean_rating):
+    def _compute_predicted_rating(self, user, similar_offers_df):
         similar_offers_df["prediction_contribution"] = (
             similar_offers_df["similarity"] * similar_offers_df["rating"]
         )
@@ -111,8 +105,6 @@ class CollaborativeFiltering:
             similar_offers_df["prediction_contribution"].sum()
             / similar_offers_df["similarity"].sum()
         )
-        predicted_rating += mean_rating.loc[user]
-
         return predicted_rating
 
     def compute_all_ratings_for_user(self, user):
@@ -122,7 +114,6 @@ class CollaborativeFiltering:
         not_rated_offers = [offer for offer in all_offers if offer not in rated_offers]
 
         user_ratings_pre = user_ratings.copy()
-        user_ratings_pre += self.mean_ratings.loc[user]
         user_ratings_with_predictions = user_ratings_pre.copy()
 
         for offer in not_rated_offers:
@@ -136,11 +127,9 @@ class CollaborativeFiltering:
             prediction_rating = self._compute_predicted_rating(
                 user=user,
                 similar_offers_df=similar_offers,
-                mean_rating=self.mean_ratings,
             )
 
             user_ratings_with_predictions[offer] = prediction_rating
-        # print(user_ratings_with_predictions)
 
         ratings_table = pd.DataFrame(
             dict(

@@ -1,8 +1,10 @@
 from decimal import Decimal
+from time import sleep
 
 import numpy as np
 import pandas as pd
 from sklearn.model_selection import KFold
+from tqdm import tqdm
 
 import scripts.data as d
 from scripts.recommender import CollaborativeFiltering
@@ -87,7 +89,7 @@ class RecommenderEval:
         )
         test = test_temp[test_temp["rank"] > min_rank]
 
-        additional_training_data = test_temp[test_temp["rank"] >= min_rank]
+        additional_training_data = test_temp[test_temp["rank"] <= min_rank]
         train = train.append(additional_training_data)
 
         return test, train
@@ -100,9 +102,6 @@ if __name__ == "__main__":
     stacked_ratings = stacked_ratings.reset_index()
     stacked_ratings.columns = ["user_id", "offer_id", "rating"]
 
-    single_user = "00857b24b13f4fe0ad17b605f00357f5"
-    single_user_ratings = stacked_ratings[stacked_ratings["user_id"] == single_user]
-
     recommender_eval = RecommenderEval()
 
     # Clean ratings (remove users where minimum number of ratings is below a threshold)
@@ -110,17 +109,20 @@ if __name__ == "__main__":
     users = clean_ratings["user_id"].unique()
 
     # Split users into training and test using KFolds
-    kf = recommender_eval.split_users()
+    n_folds = 5
+    kf = recommender_eval.split_users(n_folds)
 
     validation_no = 0
     paks, raks, maes = Decimal(0.0), Decimal(0.0), Decimal(0.0)
 
-    min_rank = 4
+    min_rank = 2
+
+    precision_all_folds_list = []
+    recall_all_folds_list = []
     for train, test in kf.split(users):
-        overlap = set(train).intersection(set(test))
-        if overlap:
-            print("overlap is {overlap}")
         validation_no += 1
+        print(f"Split no. {validation_no} / 5")
+
         test_data, train_data = recommender_eval.split_data(
             min_rank, clean_ratings, users[test], users[train]
         )
@@ -136,23 +138,21 @@ if __name__ == "__main__":
         counter = 0
         users_precision_list = []
         users_recall_list = []
-        for user in users[test]:
+        for user in tqdm(users[test]):
+            sleep(0.0001)
             counter += 1
-            single_user_ratings = stacked_ratings[stacked_ratings["user_id"] == user]
             user_train_data = train_data[train_data["user_id"] == user]
             user_test_data = test_data[test_data["user_id"] == user]
             if not user_test_data.empty:
-                print(
-                    f"Generating recommendations for user {user} ({counter}/{len(users[test])})"
-                )
-                user_recs = cf_recommender.recommend_for_user(user=user, n=10)
+                user_recs = cf_recommender.recommend_for_user(user=user, n=3)
 
-                offered_and_redeemed = user_test_data[user_test_data["rating"] > 0][
-                    "offer_id"
-                ]
-                offered_not_redeemed = user_test_data[user_test_data["rating"] == 0][
-                    "offer_id"
-                ]
+                offered_and_redeemed = list(
+                    user_test_data[user_test_data["rating"] > 0]["offer_id"]
+                )
+
+                offered_not_redeemed = list(
+                    user_test_data[user_test_data["rating"] == 0]["offer_id"]
+                )
 
                 tp_offers = [r for r in user_recs if r in offered_and_redeemed]
                 fp_offers = [r for r in user_recs if r in offered_not_redeemed]
@@ -166,22 +166,40 @@ if __name__ == "__main__":
                     user_recall = np.divide(
                         len(tp_offers), (len(tp_offers) + len(fn_offers))
                     )
-                print("next")
 
                 users_precision_list.append(user_precision)
                 users_recall_list.append(user_recall)
 
-            if counter % 10 == 0:
-                print(counter)
-        print("end of loop")
-        # paks += user_precision
-        # raks += user_recall
+        precision_fold = np.nanmean(users_precision_list)
+        recall_fold = np.nanmean(users_recall_list)
 
-        # # Append Precision and Recall to list
-        #
-        # #
-        # paks += pak
-        # raks += rak
-        # results = {'pak': paks / self.folds,
-        #            'rak': raks / self.folds,
-        #            'mae': maes / self.folds}
+        precision_all_folds_list.append(precision_fold)
+        recall_all_folds_list.append(recall_fold)
+
+        print("Precision for fold is:", precision_fold)
+        print("Recall for fold is:", recall_fold)
+
+    precision_all_folds = np.nanmean(precision_all_folds_list)
+    recall_all_folds = np.nanmean(recall_all_folds_list)
+
+    print("Overall precision is:", precision_all_folds)
+    print("Overall recall is:", recall_all_folds)
+
+    evaluation_results = pd.DataFrame(
+        dict(
+            fold=np.array(range(n_folds)) + 1,
+            precision=precision_all_folds_list,
+            recall=recall_all_folds_list,
+        ),
+    )
+    # Append average over all folds
+    evaluation_results = evaluation_results.append(
+        {
+            "fold": "average",
+            "precision": precision_all_folds,
+            "recall": recall_all_folds,
+        },
+        ignore_index=True,
+    )
+
+    evaluation_results.to_csv("data_cache/evaluation_results_cf.csv", index=False)
