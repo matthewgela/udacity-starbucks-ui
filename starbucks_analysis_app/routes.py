@@ -7,8 +7,15 @@ from flask import render_template, request
 
 from scripts.data import customer_group_figures, return_figures
 from scripts.predictions import generate_prediction
+from scripts.recommender import CollaborativeFiltering, create_user_offer_matrix
 from starbucks_analysis_app import app
 
+# Train recommender model
+user_offer_matrix = create_user_offer_matrix()
+cf_recommender = CollaborativeFiltering(top_k=3, basis="item")
+cf_recommender.train(user_offer_matrix)
+
+# Load clustering model
 model = joblib.load("models/customer_kmeans.joblib")
 
 
@@ -96,7 +103,9 @@ def customer():
 
 @app.route("/recommendation", methods=["POST", "GET"])
 def recommendation():
-    ratings_table = generate_prediction(user="100000", perform_mapping=True)
+    ratings_table = generate_prediction(
+        user="100000", recommender=cf_recommender, num_recs=3, perform_mapping=True
+    )
 
     # Render page
     if request.method == "GET":
@@ -113,7 +122,13 @@ def recommendation():
         print(data)
 
         # Generate recommendation
-        ratings_table = generate_prediction(user=data["id"], perform_mapping=True)
+
+        ratings_table = generate_prediction(
+            user=data["id"],
+            recommender=cf_recommender,
+            num_recs=3,
+            perform_mapping=True,
+        )
 
         top_3_predictions = list(
             ratings_table[ratings_table["Customer Ratings"] == "-"]["Offer name"][

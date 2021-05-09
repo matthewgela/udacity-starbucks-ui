@@ -54,6 +54,15 @@ def normalise_user_offer_matrix(user_offer_matrix, mean_offer_rating):
     return user_offer_matrix.sub(mean_offer_rating, axis="rows")
 
 
+def remove_informational_offers(ratings_table, information_offer_ids=[]):
+    if not information_offer_ids:
+        information_offer_ids = [
+            "3f207df678b143eea3cee63160fa8bed",
+            "5a8bc65990b245e5a138643cd4eb9837",
+        ]
+    return ratings_table.drop(information_offer_ids, axis=1)
+
+
 class CollaborativeFiltering:
     def __init__(self, top_k, basis):
         # TODO - fill with hyperparameters
@@ -71,7 +80,7 @@ class CollaborativeFiltering:
         return similarity_matrix
 
     def train(self, user_offer_matrix):
-        self.user_offer_matrix = user_offer_matrix
+        self.user_offer_matrix = remove_informational_offers(user_offer_matrix)
         self.similarity_matrix = self._compute_similarity(self.user_offer_matrix)
 
     def _compute_similar_offers(
@@ -107,7 +116,7 @@ class CollaborativeFiltering:
         )
         return predicted_rating
 
-    def compute_all_ratings_for_user(self, user):
+    def compute_all_ratings_for_user(self, user, n_similar):
         user_ratings = self.user_offer_matrix.loc[user]
         all_offers = user_ratings.index
         rated_offers = user_ratings.copy().dropna().index
@@ -121,7 +130,7 @@ class CollaborativeFiltering:
             similar_offers = self._compute_similar_offers(
                 user=user,
                 offer=offer,
-                top_n=3,
+                top_n=n_similar,
             )
 
             prediction_rating = self._compute_predicted_rating(
@@ -143,7 +152,7 @@ class CollaborativeFiltering:
 
         return ratings_table
 
-    def recommend(self, test_users, n):
+    def recommend(self, test_users, n, n_sim=2):
         test_user_recommendations = []
         counter = 0
         for user in test_users:
@@ -151,7 +160,7 @@ class CollaborativeFiltering:
             print(
                 f"Generating recommendations for user {user} ({counter}/{len(test_users)})"
             )
-            user_ratings_df = self.compute_all_ratings_for_user(user)
+            user_ratings_df = self.compute_all_ratings_for_user(user, n_similar=n_sim)
             not_rated_before_mask = user_ratings_df["Ratings"].isna()
             new_ratings_table = user_ratings_df.loc[not_rated_before_mask].copy()
             new_ratings_table.sort_values(
@@ -160,14 +169,17 @@ class CollaborativeFiltering:
             test_user_recommendations.append(list(new_ratings_table["Offer"][:n]))
         return dict(zip(test_users, test_user_recommendations))
 
-    def recommend_for_user(self, user, n):
-        user_ratings_df = self.compute_all_ratings_for_user(user)
-        not_rated_before_mask = user_ratings_df["Ratings"].isna()
-        new_ratings_table = user_ratings_df.loc[not_rated_before_mask].copy()
-        new_ratings_table.sort_values(
+    def recommend_for_user(self, user, n, n_sim=2, return_all_ratings=False):
+        user_ratings_df = self.compute_all_ratings_for_user(user, n_similar=n_sim)
+        user_ratings_df.sort_values(
             by="Ratings with predictions", ascending=False, inplace=True
         )
-        return list(new_ratings_table["Offer"][:n])
+        if return_all_ratings:
+            return user_ratings_df
+        else:
+            not_rated_before_mask = user_ratings_df["Ratings"].isna()
+            new_ratings_table = user_ratings_df.loc[not_rated_before_mask].copy()
+            return list(new_ratings_table["Offer"][:n])
 
 
 if __name__ == "__main__":
