@@ -125,7 +125,7 @@ if __name__ == "__main__":
 
     # Train recommender model
     user_offer_matrix = create_user_offer_matrix()
-    cf_recommender = CollaborativeFiltering(top_k=3, basis="item")
+    cf_recommender = CollaborativeFiltering(n_sim=3, basis="item")
     cf_recommender.train(user_offer_matrix)
 
     user_ratings1 = generate_prediction(
