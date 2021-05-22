@@ -4,7 +4,7 @@ from sklearn.model_selection import KFold
 from tqdm import tqdm
 
 import scripts.data as d
-from scripts.recommender import CollaborativeFiltering
+from scripts.recommender import CollaborativeFiltering, ContentBasedFiltering
 
 
 def clean_items_from_matrix(df):
@@ -14,6 +14,23 @@ def clean_items_from_matrix(df):
         if cond:
             drop_list.append(col)
     return df.drop(drop_list, axis=1)
+
+
+def create_content_table(basis):
+    portfolio_pp, profile_pp, _ = d.read_and_preprocess()
+    if basis == "item":
+        content_table = portfolio_pp.copy()
+
+        offer_type_one_hot = pd.get_dummies(content_table["offer_type"])
+        content_table = pd.concat([content_table, offer_type_one_hot], axis=1)
+
+        drop_columns = ["channels", "offer name", "offer_type"]
+        content_table = content_table.drop(drop_columns, axis=1)
+        content_table = content_table.set_index("id")
+
+        return content_table
+    elif basis == "user":
+        return profile_pp
 
 
 def create_stacked_ratings_table():
@@ -88,7 +105,7 @@ class Evaluation:
         return ratings
 
     def split_users(self):
-        kf = KFold(n_splits=self.n_folds)
+        kf = KFold(n_splits=self.n_folds, random_state=1)
         return kf
 
     def split_data(self, ratings, test_users, train_users):
@@ -108,20 +125,23 @@ class Evaluation:
         return test, train
 
     @staticmethod
-    def train_recommender(recommender_type, basis, n_sim, training_data):
+    def train_recommender(recommender_type, basis, n_sim, training_data, content_table):
         if recommender_type == "cf":
             recommender = CollaborativeFiltering(n_sim=n_sim, basis=basis)
             recommender.train(training_data)
+        elif recommender_type == "cbf":
+            recommender = ContentBasedFiltering(n_sim=n_sim, basis=basis)
+            recommender.train(training_data, content_table)
         else:
             print("Recommender not supported by evaluation")
             pass
         return recommender
 
-    def run(self, clean_ratings, users, n_sim, rec_type, basis_type, kf):
+    def run(self, clean_ratings, users, n_sim, rec_type, basis_type, kfold):
 
         precision_all_folds_list = []
         recall_all_folds_list = []
-        for validation_no, (train, test) in enumerate(kf.split(users)):
+        for validation_no, (train, test) in enumerate(kfold.split(users)):
             print(f"Split no. {validation_no} / 5")
 
             test_data, train_data = evaluation.split_data(
@@ -132,12 +152,16 @@ class Evaluation:
             # TODO - Turn into 'Preprocess training fold?' which would be different per recommender type
             train_matrix = unstack_ratings(train_data)
 
+            content_table = (
+                create_content_table(basis_type) if rec_type == "cbf" else None
+            )
             # Initialise and train recommender based on training fold
             recommender = evaluation.train_recommender(
                 recommender_type=rec_type,
                 basis=basis_type,
                 n_sim=n_sim,
                 training_data=train_matrix,
+                content_table=content_table,
             )
 
             # Evaluate the recommender
@@ -214,8 +238,10 @@ class Evaluation:
         return evaluation_results
 
     @staticmethod
-    def export_results(evaluation_results):
-        evaluation_results.to_csv("data_cache/evaluation_results_cf.csv", index=False)
+    def export_results(evaluation_results, rec_type):
+        evaluation_results.to_csv(
+            f"data_cache/evaluation_results_{rec_type}.csv", index=False
+        )
 
 
 if __name__ == "__main__":
@@ -229,8 +255,8 @@ if __name__ == "__main__":
     k = 3  # Number of recommendations, k, for which the recommender should be evaluated
 
     # Set parameters for recommender
-    n_sim = 3  # Neighbourhood of similarity for recommender
-    rec_type = "cf"  # Type of recommender algorithm
+    n_sim = 1  # Neighbourhood of similarity for recommender
+    # rec_type = "cbf"  # Type of recommender algorithm
     basis_type = "item"  # Users vs Items - what is used to calculate similarity metrics
 
     evaluation = Evaluation(min_ratings_threshold, n_folds, min_rank, k)
@@ -240,11 +266,14 @@ if __name__ == "__main__":
     users = clean_ratings["user_id"].unique()
 
     # Split users into training and test using KFolds
-    kf = evaluation.split_users()
+    train_test_split = evaluation.split_users()
 
-    recommender_evaluation = evaluation.run(
-        clean_ratings, users, n_sim, rec_type, basis_type, kf
-    )
+    rec_types = ["cf", "cbf"]  # Type of recommender algorithm
 
-    # Export evaluation results
-    evaluation.export_results(recommender_evaluation)
+    for rec_type in rec_types:
+        recommender_evaluation = evaluation.run(
+            clean_ratings, users, n_sim, rec_type, basis_type, train_test_split
+        )
+
+        # Export evaluation results
+        evaluation.export_results(recommender_evaluation, rec_type)

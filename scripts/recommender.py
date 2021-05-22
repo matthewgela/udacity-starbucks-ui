@@ -27,6 +27,23 @@ def create_user_offer_matrix():
     return user_offer_matrix
 
 
+def create_content_table(basis):
+    portfolio_pp, profile_pp, _ = d.read_and_preprocess()
+    if basis == "item":
+        content_table = portfolio_pp.copy()
+
+        offer_type_one_hot = pd.get_dummies(content_table["offer_type"])
+        content_table = pd.concat([content_table, offer_type_one_hot], axis=1)
+
+        drop_columns = ["channels", "offer name", "offer_type"]
+        content_table = content_table.drop(drop_columns, axis=1)
+        content_table = content_table.set_index("id")
+
+        return content_table
+    elif basis == "user":
+        return profile_pp
+
+
 def compute_similarity_matrix(df, method="cosine"):
     similarity_matrix = np.zeros([df.shape[1], df.shape[1]])
     for i, offer1 in enumerate(df.columns):
@@ -67,24 +84,18 @@ def remove_informational_offers(ratings_table, information_offer_ids=[]):
     return ratings_table.drop(drop_cols, axis=1)
 
 
-class CollaborativeFiltering:
+class BaseRecommender:
     def __init__(self, n_sim, basis):
+        self.user_offer_matrix = None
+        self.similarity_matrix = None
         self.basis = basis
         self.n_sim = n_sim
 
-    def _compute_similarity(self, user_offer_matrix):
-        if self.basis == "item":
-            similarity_matrix = compute_similarity_matrix(
-                df=user_offer_matrix, method="cosine"
-            )
-        elif self.basis == "user":
-            pass
+    def _compute_similarity(self):
+        pass
 
-        return similarity_matrix
-
-    def train(self, user_offer_matrix):
-        self.user_offer_matrix = remove_informational_offers(user_offer_matrix)
-        self.similarity_matrix = self._compute_similarity(self.user_offer_matrix)
+    def train(self):
+        pass
 
     def _compute_similar_offers(
         self,
@@ -182,28 +193,55 @@ class CollaborativeFiltering:
             return list(new_ratings_table["Offer"][:n_recommend])
 
 
-class ContentBasedFiltering:
-    def __init__(self, basis, n_sim):
-        self.basis = basis
-        self.n_sim = n_sim
+class CollaborativeFiltering(BaseRecommender):
+    def __init__(self, n_sim, basis):
+        super().__init__(n_sim, basis)
 
-    def train(self):
-        pass
+    def _compute_similarity(self, user_offer_matrix):
+        if self.basis == "item":
+            similarity_matrix = compute_similarity_matrix(
+                df=user_offer_matrix, method="cosine"
+            )
+        elif self.basis == "user":
+            pass
 
-    def recommend(self):
-        pass
+        return similarity_matrix
 
-    def recommend_for_user(self):
-        pass
+    def train(self, user_offer_matrix):
+        self.user_offer_matrix = remove_informational_offers(user_offer_matrix)
+        self.similarity_matrix = self._compute_similarity(self.user_offer_matrix)
+
+
+class ContentBasedFiltering(BaseRecommender):
+    def __init__(self, n_sim, basis):
+        super().__init__(n_sim, basis)
+
+    def _compute_similarity(self, content_table):
+        if self.basis == "item":
+            similarity_matrix = compute_similarity_matrix(
+                df=content_table.T, method="cosine"
+            )
+        elif self.basis == "user":
+            pass
+
+        return similarity_matrix
+
+    def train(self, user_offer_matrix, content_table):
+        self.user_offer_matrix = remove_informational_offers(user_offer_matrix)
+        self.similarity_matrix = self._compute_similarity(content_table)
 
 
 if __name__ == "__main__":
+    # Collaborative filtering recommender
     user_offer_matrix = create_user_offer_matrix()
-
     cf_recommender = CollaborativeFiltering(n_sim=3, basis="item")
-
     cf_recommender.train(user_offer_matrix)
-
     test_list = ["2eeac8d8feae4a8cad5a6af0499a211d", "31dda685af34476cad5bc968bdb01c53"]
-
     recs = cf_recommender.recommend(test_list, 3)
+
+    # Content based filtering recommender
+    content_table = create_content_table(basis="item")
+    cbf_recommender = ContentBasedFiltering(n_sim=3, basis="item")
+    cbf_recommender.train(user_offer_matrix, content_table)
+    recs_cbf = cbf_recommender.recommend(test_list, 3)
+    print("recs done")
