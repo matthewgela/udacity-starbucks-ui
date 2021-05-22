@@ -12,7 +12,7 @@ from starbucks_analysis_app import app
 
 # Train recommender model
 user_offer_matrix = create_user_offer_matrix()
-cf_recommender = CollaborativeFiltering(top_k=3, basis="item")
+cf_recommender = CollaborativeFiltering(n_sim=3, basis="item")
 cf_recommender.train(user_offer_matrix)
 
 # Load clustering model

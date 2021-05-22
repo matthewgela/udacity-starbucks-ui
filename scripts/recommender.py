@@ -60,14 +60,17 @@ def remove_informational_offers(ratings_table, information_offer_ids=[]):
             "3f207df678b143eea3cee63160fa8bed",
             "5a8bc65990b245e5a138643cd4eb9837",
         ]
-    return ratings_table.drop(information_offer_ids, axis=1)
+    drop_cols = [
+        offer for offer in information_offer_ids if offer in ratings_table.columns
+    ]
+
+    return ratings_table.drop(drop_cols, axis=1)
 
 
 class CollaborativeFiltering:
-    def __init__(self, top_k, basis):
-        # TODO - fill with hyperparameters
-        self.top_k = top_k
+    def __init__(self, n_sim, basis):
         self.basis = basis
+        self.n_sim = n_sim
 
     def _compute_similarity(self, user_offer_matrix):
         if self.basis == "item":
@@ -87,7 +90,6 @@ class CollaborativeFiltering:
         self,
         user,
         offer,
-        top_n=3,
     ):
         user_record = self.user_offer_matrix.loc[user].dropna()
         user_offers = user_record.index
@@ -98,7 +100,7 @@ class CollaborativeFiltering:
         offer_col = self.similarity_matrix.loc[condition, offer].sort_values(
             ascending=False
         )
-        neighbourhood = offer_col[:top_n]
+        neighbourhood = offer_col[: self.n_sim]
 
         similar_offers_df = pd.concat([neighbourhood, user_record], axis=1)
         similar_offers_df = similar_offers_df.dropna(how="any")
@@ -116,7 +118,7 @@ class CollaborativeFiltering:
         )
         return predicted_rating
 
-    def compute_all_ratings_for_user(self, user, n_similar):
+    def compute_all_ratings_for_user(self, user):
         user_ratings = self.user_offer_matrix.loc[user]
         all_offers = user_ratings.index
         rated_offers = user_ratings.copy().dropna().index
@@ -126,11 +128,9 @@ class CollaborativeFiltering:
         user_ratings_with_predictions = user_ratings_pre.copy()
 
         for offer in not_rated_offers:
-            # print("offer: ", offer)
             similar_offers = self._compute_similar_offers(
                 user=user,
                 offer=offer,
-                top_n=n_similar,
             )
 
             prediction_rating = self._compute_predicted_rating(
@@ -152,7 +152,7 @@ class CollaborativeFiltering:
 
         return ratings_table
 
-    def recommend(self, test_users, n, n_sim=2):
+    def recommend(self, test_users, n):
         test_user_recommendations = []
         counter = 0
         for user in test_users:
@@ -160,7 +160,7 @@ class CollaborativeFiltering:
             print(
                 f"Generating recommendations for user {user} ({counter}/{len(test_users)})"
             )
-            user_ratings_df = self.compute_all_ratings_for_user(user, n_similar=n_sim)
+            user_ratings_df = self.compute_all_ratings_for_user(user)
             not_rated_before_mask = user_ratings_df["Ratings"].isna()
             new_ratings_table = user_ratings_df.loc[not_rated_before_mask].copy()
             new_ratings_table.sort_values(
@@ -169,8 +169,8 @@ class CollaborativeFiltering:
             test_user_recommendations.append(list(new_ratings_table["Offer"][:n]))
         return dict(zip(test_users, test_user_recommendations))
 
-    def recommend_for_user(self, user, n, n_sim=2, return_all_ratings=False):
-        user_ratings_df = self.compute_all_ratings_for_user(user, n_similar=n_sim)
+    def recommend_for_user(self, user, n_recommend, return_all_ratings=False):
+        user_ratings_df = self.compute_all_ratings_for_user(user)
         user_ratings_df.sort_values(
             by="Ratings with predictions", ascending=False, inplace=True
         )
@@ -179,13 +179,28 @@ class CollaborativeFiltering:
         else:
             not_rated_before_mask = user_ratings_df["Ratings"].isna()
             new_ratings_table = user_ratings_df.loc[not_rated_before_mask].copy()
-            return list(new_ratings_table["Offer"][:n])
+            return list(new_ratings_table["Offer"][:n_recommend])
+
+
+class ContentBasedFiltering:
+    def __init__(self, basis, n_sim):
+        self.basis = basis
+        self.n_sim = n_sim
+
+    def train(self):
+        pass
+
+    def recommend(self):
+        pass
+
+    def recommend_for_user(self):
+        pass
 
 
 if __name__ == "__main__":
     user_offer_matrix = create_user_offer_matrix()
 
-    cf_recommender = CollaborativeFiltering(top_k=3, basis="item")
+    cf_recommender = CollaborativeFiltering(n_sim=3, basis="item")
 
     cf_recommender.train(user_offer_matrix)
 
