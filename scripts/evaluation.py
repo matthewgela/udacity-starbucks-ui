@@ -125,19 +125,34 @@ class Evaluation:
         return test, train
 
     @staticmethod
-    def train_recommender(recommender_type, basis, n_sim, training_data, content_table):
+    def train_recommender(
+        recommender_type, basis, n_sim, training_data, content_table, similarity_method
+    ):
         if recommender_type == "cf":
-            recommender = CollaborativeFiltering(n_sim=n_sim, basis=basis)
-            recommender.train(training_data)
+            recommender = CollaborativeFiltering(
+                n_sim=n_sim, basis=basis, similarity_method=similarity_method
+            )
+            recommender.train(training_data, compute_similarity_matrix=False)
         elif recommender_type == "cbf":
-            recommender = ContentBasedFiltering(n_sim=n_sim, basis=basis)
+            recommender = ContentBasedFiltering(
+                n_sim=n_sim, basis=basis, similarity_method=similarity_method
+            )
             recommender.train(training_data, content_table)
         else:
             print("Recommender not supported by evaluation")
             pass
         return recommender
 
-    def run(self, clean_ratings, users, n_sim, rec_type, basis_type, kfold):
+    def run(
+        self,
+        clean_ratings,
+        users,
+        n_sim,
+        rec_type,
+        basis_type,
+        kfold,
+        similarity_method,
+    ):
 
         precision_all_folds_list = []
         recall_all_folds_list = []
@@ -162,6 +177,7 @@ class Evaluation:
                 n_sim=n_sim,
                 training_data=train_matrix,
                 content_table=content_table,
+                similarity_method=similarity_method,
             )
 
             # Evaluate the recommender
@@ -238,9 +254,10 @@ class Evaluation:
         return evaluation_results
 
     @staticmethod
-    def export_results(evaluation_results, rec_type):
+    def export_results(evaluation_results, rec_type, similarity_method, basis_type):
         evaluation_results.to_csv(
-            f"data_cache/evaluation_results_{rec_type}.csv", index=False
+            f"data_cache/evaluation_results_{rec_type}_{basis_type}_{similarity_method}.csv",
+            index=False,
         )
 
 
@@ -257,7 +274,8 @@ if __name__ == "__main__":
     # Set parameters for recommender
     n_sim = 1  # Neighbourhood of similarity for recommender
     # rec_type = "cbf"  # Type of recommender algorithm
-    basis_type = "item"  # Users vs Items - what is used to calculate similarity metrics
+    basis_type = "user"  # Users vs Items - what is used to calculate similarity metrics
+    similarity_method = "jaccard"
 
     evaluation = Evaluation(min_ratings_threshold, n_folds, min_rank, k)
 
@@ -272,8 +290,16 @@ if __name__ == "__main__":
 
     for rec_type in rec_types:
         recommender_evaluation = evaluation.run(
-            clean_ratings, users, n_sim, rec_type, basis_type, train_test_split
+            clean_ratings,
+            users,
+            n_sim,
+            rec_type,
+            basis_type,
+            train_test_split,
+            similarity_method,
         )
 
         # Export evaluation results
-        evaluation.export_results(recommender_evaluation, rec_type)
+        evaluation.export_results(
+            recommender_evaluation, rec_type, similarity_method, basis_type
+        )

@@ -122,10 +122,13 @@ def generate_prediction(user, recommender, num_recs, perform_mapping=False):
 
 if __name__ == "__main__":
     user1 = "100006"
+    similarity_method = "jaccard"
 
     # Train recommender model
     user_offer_matrix = create_user_offer_matrix()
-    cf_recommender = CollaborativeFiltering(n_sim=3, basis="item")
+    cf_recommender = CollaborativeFiltering(
+        n_sim=3, basis="item", similarity_method=similarity_method
+    )
     cf_recommender.train(user_offer_matrix)
 
     user_ratings1 = generate_prediction(

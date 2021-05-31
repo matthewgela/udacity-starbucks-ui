@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from tqdm import tqdm
 
 import scripts.data as d
 
@@ -44,16 +45,43 @@ def create_content_table(basis):
         return profile_pp
 
 
-def compute_similarity_matrix(df, method="cosine"):
+def compute_similarity_array(df, method, item_name):
+    similarity_matrix = np.zeros(df.shape[1])
+
+    print(f"Calculating similarities for {item_name}")
+    for i, compare_item in enumerate(tqdm((df.columns))):
+        mask = df[item_name].notna() & df[compare_item].notna()
+        if method == "cosine":
+            numerator = sum(df.loc[mask, item_name] * df.loc[mask, compare_item])
+            denominator = np.sqrt(sum(df.loc[mask, item_name] ** 2)) * np.sqrt(
+                sum(df.loc[mask, compare_item] ** 2)
+            )
+        elif method == "jaccard":
+            numerator = np.sum(((df[item_name] > 0) & (df[compare_item] > 0)) & mask)
+            denominator = np.sum(((df[item_name] > 0) | (df[compare_item] > 0)) & mask)
+
+        similarity_matrix[i] = numerator / denominator if denominator != 0 else np.nan
+
+    similarity_matrix_df = pd.DataFrame(similarity_matrix, columns=[item_name])
+    similarity_matrix_df.index = df.columns
+    return similarity_matrix_df
+
+
+def compute_similarity_matrix(df, method):
     similarity_matrix = np.zeros([df.shape[1], df.shape[1]])
     for i, offer1 in enumerate(df.columns):
-        for j, offer2 in enumerate(df.columns):
+        print(f"Calculating similarities for user {offer1}")
+        for j, offer2 in enumerate(tqdm((df.columns))):
             mask = df[offer1].notna() & df[offer2].notna()
             if method == "cosine":
                 numerator = sum(df.loc[mask, offer1] * df.loc[mask, offer2])
                 denominator = np.sqrt(sum(df.loc[mask, offer1] ** 2)) * np.sqrt(
                     sum(df.loc[mask, offer2] ** 2)
                 )
+            elif method == "jaccard":
+                numerator = np.sum(((df[offer1] > 0) & (df[offer2] > 0)) & mask)
+                denominator = np.sum(((df[offer1] > 0) | (df[offer2] > 0)) & mask)
+
             similarity_matrix[i, j] = (
                 numerator / denominator if denominator != 0 else np.nan
             )
@@ -85,23 +113,28 @@ def remove_informational_offers(ratings_table, information_offer_ids=[]):
 
 
 class BaseRecommender:
-    def __init__(self, n_sim, basis):
+    def __init__(self, n_sim, basis, similarity_method):
         self.user_offer_matrix = None
         self.similarity_matrix = None
         self.basis = basis
         self.n_sim = n_sim
+        self.similarity_method = similarity_method
 
-    def _compute_similarity(self):
-        pass
+    def _compute_similarity(self, *args, **kwargs):
+        raise NotImplementedError
 
-    def train(self):
-        pass
+    def train(self, *args, **kwargs):
+        raise NotImplementedError
 
     def _compute_similar_offers(
         self,
         user,
         offer,
     ):
+
+        # if not self.compute_similarity_matrix:
+        #     self.similarity_matrix = self._compute_similarity(self.user_offer_matrix, item_id=offer)
+
         user_record = self.user_offer_matrix.loc[user].dropna()
         user_offers = user_record.index
 
@@ -118,6 +151,25 @@ class BaseRecommender:
         similar_offers_df.columns = ["similarity", "rating"]
 
         return similar_offers_df
+
+    def _compute_similar_users(self, user, offer):
+
+        # if not self.compute_similarity_matrix:
+        #     self.similarity_matrix = self._compute_similarity(user_offer_matrix=self.user_offer_matrix, item_id=user)
+
+        user_col = self.similarity_matrix[user]
+
+        offer_ratings = self.user_offer_matrix[offer]
+
+        users_df = pd.concat([user_col, offer_ratings], axis=1)
+        users_df = users_df.dropna(how="any")
+        users_df.columns = ["similarity", "rating"]
+
+        users_df = users_df.sort_values(by="similarity", ascending=False)
+        similar_users_df = users_df[users_df["similarity"] > 0.9]
+        # similar_users_df = users_df.head(self.n_sim)
+
+        return similar_users_df
 
     def _compute_predicted_rating(self, user, similar_offers_df):
         similar_offers_df["prediction_contribution"] = (
@@ -138,15 +190,28 @@ class BaseRecommender:
         user_ratings_pre = user_ratings.copy()
         user_ratings_with_predictions = user_ratings_pre.copy()
 
-        for offer in not_rated_offers:
-            similar_offers = self._compute_similar_offers(
-                user=user,
-                offer=offer,
+        item_id = user if self.basis == "user" else None
+
+        if not self.compute_similarity_matrix:
+            self.similarity_matrix = self._compute_similarity(
+                self.user_offer_matrix, item_id=item_id
             )
+
+        for offer in not_rated_offers:
+            if self.basis == "item":
+                neighbourhood = self._compute_similar_offers(
+                    user=user,
+                    offer=offer,
+                )
+            elif self.basis == "user":
+                neighbourhood = self._compute_similar_users(
+                    user=user,
+                    offer=offer,
+                )
 
             prediction_rating = self._compute_predicted_rating(
                 user=user,
-                similar_offers_df=similar_offers,
+                similar_offers_df=neighbourhood,
             )
 
             user_ratings_with_predictions[offer] = prediction_rating
@@ -194,32 +259,50 @@ class BaseRecommender:
 
 
 class CollaborativeFiltering(BaseRecommender):
-    def __init__(self, n_sim, basis):
-        super().__init__(n_sim, basis)
+    def __init__(self, n_sim, basis, similarity_method):
+        super().__init__(n_sim, basis, similarity_method)
 
-    def _compute_similarity(self, user_offer_matrix):
+    def _compute_similarity(self, user_offer_matrix, item_id=None):
         if self.basis == "item":
-            similarity_matrix = compute_similarity_matrix(
-                df=user_offer_matrix, method="cosine"
-            )
+            if item_id:
+                similarity_matrix = compute_similarity_array(
+                    df=user_offer_matrix,
+                    method=self.similarity_method,
+                    item_name=item_id,
+                )
+            else:
+                similarity_matrix = compute_similarity_matrix(
+                    df=user_offer_matrix, method=self.similarity_method
+                )
         elif self.basis == "user":
-            pass
+            if item_id:
+                similarity_matrix = compute_similarity_array(
+                    df=user_offer_matrix.T,
+                    method=self.similarity_method,
+                    item_name=item_id,
+                )
+            else:
+                similarity_matrix = compute_similarity_matrix(
+                    df=user_offer_matrix.T, method=self.similarity_method
+                )
 
         return similarity_matrix
 
-    def train(self, user_offer_matrix):
+    def train(self, user_offer_matrix, compute_similarity_matrix=True):
+        self.compute_similarity_matrix = compute_similarity_matrix
         self.user_offer_matrix = remove_informational_offers(user_offer_matrix)
-        self.similarity_matrix = self._compute_similarity(self.user_offer_matrix)
+        if compute_similarity_matrix:
+            self.similarity_matrix = self._compute_similarity(self.user_offer_matrix)
 
 
 class ContentBasedFiltering(BaseRecommender):
-    def __init__(self, n_sim, basis):
-        super().__init__(n_sim, basis)
+    def __init__(self, n_sim, basis, similarity_method):
+        super().__init__(n_sim, basis, similarity_method)
 
     def _compute_similarity(self, content_table):
         if self.basis == "item":
             similarity_matrix = compute_similarity_matrix(
-                df=content_table.T, method="cosine"
+                df=content_table.T, method=self.similarity_method
             )
         elif self.basis == "user":
             pass
@@ -234,14 +317,19 @@ class ContentBasedFiltering(BaseRecommender):
 if __name__ == "__main__":
     # Collaborative filtering recommender
     user_offer_matrix = create_user_offer_matrix()
-    cf_recommender = CollaborativeFiltering(n_sim=3, basis="item")
-    cf_recommender.train(user_offer_matrix)
-    test_list = ["2eeac8d8feae4a8cad5a6af0499a211d", "31dda685af34476cad5bc968bdb01c53"]
+    # cf_recommender = CollaborativeFiltering(n_sim=3, basis="item", similarity_method="jaccard")
+    cf_recommender = CollaborativeFiltering(
+        n_sim=15, basis="user", similarity_method="jaccard"
+    )
+    test_list = ["0009655768c64bdeb2e877511632db8f"]
+    cf_recommender.train(user_offer_matrix, compute_similarity_matrix=False)
     recs = cf_recommender.recommend(test_list, 3)
 
     # Content based filtering recommender
     content_table = create_content_table(basis="item")
-    cbf_recommender = ContentBasedFiltering(n_sim=3, basis="item")
+    cbf_recommender = ContentBasedFiltering(
+        n_sim=3, basis="item", similarity_method="jaccard"
+    )
     cbf_recommender.train(user_offer_matrix, content_table)
     recs_cbf = cbf_recommender.recommend(test_list, 3)
     print("recs done")

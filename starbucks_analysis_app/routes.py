@@ -7,26 +7,26 @@ from flask import render_template, request
 
 from scripts.data import customer_group_figures, return_figures
 from scripts.predictions import generate_prediction
-from scripts.recommender import (
+from scripts.recommender import (  # ContentBasedFiltering,; create_content_table,
     CollaborativeFiltering,
-    ContentBasedFiltering,
-    create_content_table,
     create_user_offer_matrix,
 )
 from starbucks_analysis_app import app
 
 # Train recommender model
 user_offer_matrix = create_user_offer_matrix()
-cf_recommender = CollaborativeFiltering(n_sim=1, basis="item")
-cf_recommender.train(user_offer_matrix)
+cf_recommender = CollaborativeFiltering(
+    n_sim=15, basis="user", similarity_method="jaccard"
+)
+cf_recommender.train(user_offer_matrix, compute_similarity_matrix=False)
 
-ContentBasedFiltering
-content_table = create_content_table(basis="item")
-cbf_recommender = ContentBasedFiltering(n_sim=1, basis="item")
-cbf_recommender.train(user_offer_matrix, content_table)
+# # ContentBasedFiltering
+# content_table = create_content_table(basis="item")
+# cbf_recommender = ContentBasedFiltering(n_sim=2, basis="item", similarity_method="jaccard")
+# cbf_recommender.train(user_offer_matrix, content_table)
 
 # Recommender to use
-recommender = cbf_recommender
+recommender = cf_recommender
 
 # Load clustering model
 model = joblib.load("models/customer_kmeans.joblib")
@@ -116,17 +116,11 @@ def customer():
 
 @app.route("/recommendation", methods=["POST", "GET"])
 def recommendation():
-    ratings_table = generate_prediction(
-        user="100000", recommender=cf_recommender, num_recs=3, perform_mapping=True
-    )
 
     # Render page
     if request.method == "GET":
         return render_template(
             "recommendation.html",
-            column_names=ratings_table.columns.values,
-            row_data=list(ratings_table.values.tolist()),
-            zip=zip,
         )
 
     if request.method == "POST":
