@@ -21,7 +21,6 @@ log = logging.getLogger(__name__)
 # Train recommender model
 log.info("Loading user-offer matrix")
 user_offer_matrix = create_user_offer_matrix()
-log.info("Loaded user-offer matrix")
 cf_recommender = CollaborativeFiltering(
     n_sim=15, basis="user", similarity_method="jaccard"
 )
