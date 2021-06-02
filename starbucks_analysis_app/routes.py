@@ -18,8 +18,11 @@ user_offer_matrix = create_user_offer_matrix()
 cf_recommender = CollaborativeFiltering(
     n_sim=15, basis="user", similarity_method="jaccard"
 )
-cf_recommender.train(user_offer_matrix, compute_similarity_matrix=False)
+cf_recommender.train(
+    user_offer_matrix, compute_similarity_matrix=False, load_similarity_matrix=True
+)
 
+print("Recommender trained")
 # # ContentBasedFiltering
 # content_table = create_content_table(basis="item")
 # cbf_recommender = ContentBasedFiltering(n_sim=2, basis="item", similarity_method="jaccard")

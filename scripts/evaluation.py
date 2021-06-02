@@ -6,6 +6,8 @@ from tqdm import tqdm
 import scripts.data as d
 from scripts.recommender import CollaborativeFiltering, ContentBasedFiltering
 
+np.seterr(all="raise")
+
 
 def clean_items_from_matrix(df):
     drop_list = []
@@ -126,16 +128,28 @@ class Evaluation:
 
     @staticmethod
     def train_recommender(
-        recommender_type, basis, n_sim, training_data, content_table, similarity_method
+        recommender_type,
+        basis,
+        training_data,
+        content_table,
+        similarity_method,
+        n_sim=None,
+        similarity_threshold=None,
     ):
         if recommender_type == "cf":
             recommender = CollaborativeFiltering(
-                n_sim=n_sim, basis=basis, similarity_method=similarity_method
+                n_sim=n_sim,
+                basis=basis,
+                similarity_method=similarity_method,
+                similarity_threshold=similarity_threshold,
             )
-            recommender.train(training_data, compute_similarity_matrix=False)
+            recommender.train(training_data, compute_similarity_matrix=True)
         elif recommender_type == "cbf":
             recommender = ContentBasedFiltering(
-                n_sim=n_sim, basis=basis, similarity_method=similarity_method
+                n_sim=n_sim,
+                basis=basis,
+                similarity_method=similarity_method,
+                similarity_threshold=similarity_threshold,
             )
             recommender.train(training_data, content_table)
         else:
@@ -147,11 +161,12 @@ class Evaluation:
         self,
         clean_ratings,
         users,
-        n_sim,
         rec_type,
         basis_type,
         kfold,
         similarity_method,
+        n_sim=None,
+        similarity_threshold=None,
     ):
 
         precision_all_folds_list = []
@@ -178,6 +193,7 @@ class Evaluation:
                 training_data=train_matrix,
                 content_table=content_table,
                 similarity_method=similarity_method,
+                similarity_threshold=similarity_threshold,
             )
 
             # Evaluate the recommender
@@ -188,10 +204,10 @@ class Evaluation:
                 # Test data sets for a single user
                 user_test_data = test_data[test_data["user_id"] == user]
 
-                if not user_test_data.empty:
-                    # Produce top k recommendations for the user
-                    user_recs = recommender.recommend_for_user(user=user, n_recommend=k)
+                # Produce top k recommendations for the user
+                user_recs = recommender.recommend_for_user(user=user, n_recommend=k)
 
+                if user_recs:
                     # Calculating TP, FP, FN and TN based on the top k recs
                     offered_and_redeemed = list(
                         user_test_data[user_test_data["rating"] > 0]["offer_id"]
@@ -272,10 +288,11 @@ if __name__ == "__main__":
     k = 3  # Number of recommendations, k, for which the recommender should be evaluated
 
     # Set parameters for recommender
-    n_sim = 1  # Neighbourhood of similarity for recommender
+    n_sim = 15  # Neighbourhood of similarity for recommender
     # rec_type = "cbf"  # Type of recommender algorithm
     basis_type = "user"  # Users vs Items - what is used to calculate similarity metrics
     similarity_method = "jaccard"
+    similarity_threshold = None
 
     evaluation = Evaluation(min_ratings_threshold, n_folds, min_rank, k)
 
@@ -286,17 +303,18 @@ if __name__ == "__main__":
     # Split users into training and test using KFolds
     train_test_split = evaluation.split_users()
 
-    rec_types = ["cf", "cbf"]  # Type of recommender algorithm
+    rec_types = ["cf"]  # Type of recommender algorithm
 
     for rec_type in rec_types:
         recommender_evaluation = evaluation.run(
             clean_ratings,
             users,
-            n_sim,
             rec_type,
             basis_type,
             train_test_split,
             similarity_method,
+            n_sim,
+            similarity_threshold,
         )
 
         # Export evaluation results

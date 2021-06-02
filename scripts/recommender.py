@@ -1,8 +1,12 @@
 import numpy as np
 import pandas as pd
+import pyarrow as pa
+import pyarrow.parquet as pq
 from tqdm import tqdm
 
 import scripts.data as d
+
+# import scripts.preprocessing as pp
 
 
 def create_user_offer_matrix():
@@ -45,6 +49,36 @@ def create_content_table(basis):
         return profile_pp
 
 
+def fn_similarity(df, item_name, method, compare_item):
+    mask = df[item_name].notna() & df[compare_item].notna()
+    if method == "cosine":
+        numerator = sum(df.loc[mask, item_name] * df.loc[mask, compare_item])
+        denominator = np.sqrt(sum(df.loc[mask, item_name] ** 2)) * np.sqrt(
+            sum(df.loc[mask, compare_item] ** 2)
+        )
+    elif method == "jaccard":
+        numerator = np.sum(((df[item_name] > 0) & (df[compare_item] > 0)) & mask)
+        denominator = np.sum(((df[item_name] > 0) | (df[compare_item] > 0)) & mask)
+    return numerator / denominator if denominator != 0 else np.nan
+
+
+def compute_similarity_array_multiprocessing(df, method, item_name):
+    import multiprocessing as mp
+
+    pool = mp.Pool(2)
+    results = [
+        pool.apply(fn_similarity, args=(df, item_name, method, compare_item))
+        for compare_item in tqdm(df.columns)
+    ]
+    pool.close()
+
+    results_array = np.array(results)
+
+    similarity_matrix_df = pd.DataFrame(results_array, columns=[item_name])
+    similarity_matrix_df.index = df.columns
+    return similarity_matrix_df
+
+
 def compute_similarity_array(df, method, item_name):
     similarity_matrix = np.zeros(df.shape[1])
 
@@ -65,6 +99,37 @@ def compute_similarity_array(df, method, item_name):
     similarity_matrix_df = pd.DataFrame(similarity_matrix, columns=[item_name])
     similarity_matrix_df.index = df.columns
     return similarity_matrix_df
+
+
+def compute_similarity_matrix_vectorised(df, method):
+    if method == "cosine":
+        pass
+    elif method == "jaccard":
+        n = df.shape[1]
+        # Get the row, col indices that are to be set in output array
+        r, c = np.tril_indices(n, -1)
+
+        # Use those indicees to slice out respective columns
+        p1 = df.values[:, c]
+        p2 = df.values[:, r]
+
+        # Perform n11 and n00 vectorized computations across all indexed columns
+        n11v = ((p1 > 0) & (p2 > 0)).sum(0)
+        n00v = (((p1 > 0) | (p2 > 0)) & ~(np.isnan(p1) | np.isnan(p2))).sum(0)
+
+        # Finally, setup output array and set final division computations
+        out = np.eye(n)
+
+        default = np.empty(n00v.shape)
+        default[:] = np.nan
+        out[c, r] = np.divide(n11v, n00v, out=default, where=n00v != 0)
+
+        out = out + out.T - np.diag(np.diag(out))
+
+        similarity_matrix_df = pd.DataFrame(out, columns=df.columns)
+        similarity_matrix_df.index = df.columns
+
+        return similarity_matrix_df
 
 
 def compute_similarity_matrix(df, method):
@@ -113,12 +178,13 @@ def remove_informational_offers(ratings_table, information_offer_ids=[]):
 
 
 class BaseRecommender:
-    def __init__(self, n_sim, basis, similarity_method):
+    def __init__(self, basis, similarity_method, n_sim=None, similarity_threshold=None):
         self.user_offer_matrix = None
         self.similarity_matrix = None
         self.basis = basis
         self.n_sim = n_sim
         self.similarity_method = similarity_method
+        self.similarity_threshold = similarity_threshold
 
     def _compute_similarity(self, *args, **kwargs):
         raise NotImplementedError
@@ -131,9 +197,6 @@ class BaseRecommender:
         user,
         offer,
     ):
-
-        # if not self.compute_similarity_matrix:
-        #     self.similarity_matrix = self._compute_similarity(self.user_offer_matrix, item_id=offer)
 
         user_record = self.user_offer_matrix.loc[user].dropna()
         user_offers = user_record.index
@@ -154,9 +217,6 @@ class BaseRecommender:
 
     def _compute_similar_users(self, user, offer):
 
-        # if not self.compute_similarity_matrix:
-        #     self.similarity_matrix = self._compute_similarity(user_offer_matrix=self.user_offer_matrix, item_id=user)
-
         user_col = self.similarity_matrix[user]
 
         offer_ratings = self.user_offer_matrix[offer]
@@ -165,21 +225,32 @@ class BaseRecommender:
         users_df = users_df.dropna(how="any")
         users_df.columns = ["similarity", "rating"]
 
-        users_df = users_df.sort_values(by="similarity", ascending=False)
-        similar_users_df = users_df[users_df["similarity"] > 0.9]
-        # similar_users_df = users_df.head(self.n_sim)
+        similar_users_df = users_df[users_df["similarity"] != 0].sort_values(
+            by="similarity", ascending=False
+        )
+
+        if self.similarity_threshold:
+            similar_users_df = similar_users_df[
+                similar_users_df["similarity"] > self.similarity_threshold
+            ]
+        if self.n_sim:
+            similar_users_df = similar_users_df.head(self.n_sim)
 
         return similar_users_df
 
     def _compute_predicted_rating(self, user, similar_offers_df):
-        similar_offers_df["prediction_contribution"] = (
-            similar_offers_df["similarity"] * similar_offers_df["rating"]
-        )
-        predicted_rating = (
-            similar_offers_df["prediction_contribution"].sum()
-            / similar_offers_df["similarity"].sum()
-        )
-        return predicted_rating
+        if not similar_offers_df.empty:
+            similar_offers_df["prediction_contribution"] = (
+                similar_offers_df["similarity"] * similar_offers_df["rating"]
+            )
+
+            predicted_rating = (
+                similar_offers_df["prediction_contribution"].sum()
+                / similar_offers_df["similarity"].sum()
+            )
+            return predicted_rating
+        else:
+            return -1
 
     def compute_all_ratings_for_user(self, user):
         user_ratings = self.user_offer_matrix.loc[user]
@@ -253,14 +324,16 @@ class BaseRecommender:
         if return_all_ratings:
             return user_ratings_df
         else:
-            not_rated_before_mask = user_ratings_df["Ratings"].isna()
+            not_rated_before_mask = (user_ratings_df["Ratings"].isna()) & (
+                user_ratings_df["Ratings with predictions"] > 0
+            )
             new_ratings_table = user_ratings_df.loc[not_rated_before_mask].copy()
             return list(new_ratings_table["Offer"][:n_recommend])
 
 
 class CollaborativeFiltering(BaseRecommender):
-    def __init__(self, n_sim, basis, similarity_method):
-        super().__init__(n_sim, basis, similarity_method)
+    def __init__(self, basis, similarity_method, n_sim=None, similarity_threshold=None):
+        super().__init__(basis, similarity_method, n_sim, similarity_threshold)
 
     def _compute_similarity(self, user_offer_matrix, item_id=None):
         if self.basis == "item":
@@ -271,33 +344,75 @@ class CollaborativeFiltering(BaseRecommender):
                     item_name=item_id,
                 )
             else:
-                similarity_matrix = compute_similarity_matrix(
+                from time import time
+
+                start = time()
+                similarity_matrix = compute_similarity_matrix_vectorised(
                     df=user_offer_matrix, method=self.similarity_method
                 )
+                end = time() - start
+                print(f"item similarity computed in: {end} seconds")
         elif self.basis == "user":
             if item_id:
+                from time import time
+
+                start = time()
                 similarity_matrix = compute_similarity_array(
                     df=user_offer_matrix.T,
                     method=self.similarity_method,
                     item_name=item_id,
                 )
+                end = time() - start
+                print(f"{end} seconds")
             else:
-                similarity_matrix = compute_similarity_matrix(
+                from time import time
+
+                start = time()
+                similarity_matrix = compute_similarity_matrix_vectorised(
                     df=user_offer_matrix.T, method=self.similarity_method
                 )
+                end = time() - start
+                print(f"whole user matrix: {end} seconds")
 
         return similarity_matrix
 
-    def train(self, user_offer_matrix, compute_similarity_matrix=True):
+    def train(
+        self,
+        user_offer_matrix,
+        compute_similarity_matrix=False,
+        load_similarity_matrix=True,
+    ):
         self.compute_similarity_matrix = compute_similarity_matrix
         self.user_offer_matrix = remove_informational_offers(user_offer_matrix)
-        if compute_similarity_matrix:
+        if load_similarity_matrix:
+            self.similarity_matrix = self._load_similarity_matrix()
+        elif compute_similarity_matrix:
             self.similarity_matrix = self._compute_similarity(self.user_offer_matrix)
+
+    def _load_similarity_matrix(self):
+        try:
+            df_path = f"data_cache/similarity_matrix_{self.basis}.parquet"
+            print(f"Loading cached file: {df_path}")
+            similarity_matrix = pq.read_table(df_path)
+            print("Loaded successfully.")
+            similarity_matrix = similarity_matrix.to_pandas()
+            print("Converted to pandas")
+        except FileNotFoundError:
+            print("No cached similarity file, creating from scratch")
+            similarity_matrix = self._compute_similarity(self.user_offer_matrix)
+            self._export_similarity_matrix(similarity_matrix)
+        return similarity_matrix
+
+    def _export_similarity_matrix(self, similarity_matrix):
+        print("Exporting similarity matrix to cache")
+
+        table = pa.Table.from_pandas(similarity_matrix)
+        pq.write_table(table, f"data_cache/similarity_matrix_{self.basis}.parquet")
 
 
 class ContentBasedFiltering(BaseRecommender):
-    def __init__(self, n_sim, basis, similarity_method):
-        super().__init__(n_sim, basis, similarity_method)
+    def __init__(self, basis, similarity_method, n_sim=None, similarity_threshold=None):
+        super().__init__(basis, similarity_method, n_sim, similarity_threshold)
 
     def _compute_similarity(self, content_table):
         if self.basis == "item":
@@ -322,14 +437,16 @@ if __name__ == "__main__":
         n_sim=15, basis="user", similarity_method="jaccard"
     )
     test_list = ["0009655768c64bdeb2e877511632db8f"]
-    cf_recommender.train(user_offer_matrix, compute_similarity_matrix=False)
+    cf_recommender.train(
+        user_offer_matrix, compute_similarity_matrix=False, load_similarity_matrix=True
+    )
     recs = cf_recommender.recommend(test_list, 3)
 
     # Content based filtering recommender
-    content_table = create_content_table(basis="item")
-    cbf_recommender = ContentBasedFiltering(
-        n_sim=3, basis="item", similarity_method="jaccard"
-    )
-    cbf_recommender.train(user_offer_matrix, content_table)
-    recs_cbf = cbf_recommender.recommend(test_list, 3)
+    # content_table = create_content_table(basis="item")
+    # cbf_recommender = ContentBasedFiltering(
+    #     n_sim=3, basis="item", similarity_method="jaccard"
+    # )
+    # cbf_recommender.train(user_offer_matrix, content_table)
+    # recs_cbf = cbf_recommender.recommend(test_list, 3)
     print("recs done")
