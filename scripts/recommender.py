@@ -1,3 +1,5 @@
+import logging.config
+
 import numpy as np
 import pandas as pd
 import pyarrow as pa
@@ -7,10 +9,14 @@ from tqdm import tqdm
 import scripts.data as d
 import scripts.preprocessing as pp
 
+# Logging
+logging.config.fileConfig("logging.conf", disable_existing_loggers=False)
+log = logging.getLogger(__name__)
+
 
 def create_user_offer_matrix():
     portfolio_pp, profile_pp, transcript_pp = d.read_and_preprocess()
-
+    log.info(f"transcript file: {transcript_pp}")
     events_binary = pd.get_dummies(transcript_pp["event"])
     transcript_comb = pd.concat([transcript_pp, events_binary], axis=1)
 

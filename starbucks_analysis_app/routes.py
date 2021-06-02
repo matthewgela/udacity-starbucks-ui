@@ -1,4 +1,5 @@
 import json
+import logging.config
 
 import joblib
 import pandas as pd
@@ -13,8 +14,14 @@ from scripts.recommender import (  # ContentBasedFiltering,; create_content_tabl
 )
 from starbucks_analysis_app import app
 
+# Logging
+logging.config.fileConfig("logging.conf", disable_existing_loggers=False)
+log = logging.getLogger(__name__)
+
 # Train recommender model
+log.info("Loading user-offer matrix")
 user_offer_matrix = create_user_offer_matrix()
+log.info("Loaded user-offer matrix")
 cf_recommender = CollaborativeFiltering(
     n_sim=15, basis="user", similarity_method="jaccard"
 )
