@@ -19,7 +19,7 @@ cf_recommender = CollaborativeFiltering(
     n_sim=15, basis="user", similarity_method="jaccard"
 )
 cf_recommender.train(
-    user_offer_matrix, compute_similarity_matrix=False, load_similarity_matrix=True
+    user_offer_matrix, compute_similarity_matrix=False, load_similarity_matrix=False
 )
 
 print("Recommender trained")

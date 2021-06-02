@@ -5,8 +5,7 @@ import pyarrow.parquet as pq
 from tqdm import tqdm
 
 import scripts.data as d
-
-# import scripts.preprocessing as pp
+import scripts.preprocessing as pp
 
 
 def create_user_offer_matrix():
@@ -263,7 +262,7 @@ class BaseRecommender:
 
         item_id = user if self.basis == "user" else None
 
-        if not self.compute_similarity_matrix:
+        if not self.compute_similarity_matrix and not self.load_similarity_matrix:
             self.similarity_matrix = self._compute_similarity(
                 self.user_offer_matrix, item_id=item_id
             )
@@ -357,11 +356,18 @@ class CollaborativeFiltering(BaseRecommender):
                 from time import time
 
                 start = time()
-                similarity_matrix = compute_similarity_array(
-                    df=user_offer_matrix.T,
-                    method=self.similarity_method,
-                    item_name=item_id,
-                )
+                try:
+                    df_path = f"data_cache/similarity_matrix_{self.basis}.csv"
+                    similarity_matrix = pd.read_csv(
+                        df_path, usecols=["person", item_id], index_col="person"
+                    )
+                except FileNotFoundError:
+                    similarity_matrix = compute_similarity_array(
+                        df=user_offer_matrix.T,
+                        method=self.similarity_method,
+                        item_name=item_id,
+                    )
+
                 end = time() - start
                 print(f"{end} seconds")
             else:
@@ -383,6 +389,7 @@ class CollaborativeFiltering(BaseRecommender):
         load_similarity_matrix=True,
     ):
         self.compute_similarity_matrix = compute_similarity_matrix
+        self.load_similarity_matrix = load_similarity_matrix
         self.user_offer_matrix = remove_informational_offers(user_offer_matrix)
         if load_similarity_matrix:
             self.similarity_matrix = self._load_similarity_matrix()
@@ -391,11 +398,11 @@ class CollaborativeFiltering(BaseRecommender):
 
     def _load_similarity_matrix(self):
         try:
-            df_path = f"data_cache/similarity_matrix_{self.basis}.parquet"
+            df_path = f"data_cache/similarity_matrix_{self.basis}.csv"
             print(f"Loading cached file: {df_path}")
-            similarity_matrix = pq.read_table(df_path)
+            similarity_matrix = pp.read_data(df_path, file_type="csv", index_col=0)
             print("Loaded successfully.")
-            similarity_matrix = similarity_matrix.to_pandas()
+            # similarity_matrix = similarity_matrix.to_pandas()
             print("Converted to pandas")
         except FileNotFoundError:
             print("No cached similarity file, creating from scratch")
@@ -438,7 +445,7 @@ if __name__ == "__main__":
     )
     test_list = ["0009655768c64bdeb2e877511632db8f"]
     cf_recommender.train(
-        user_offer_matrix, compute_similarity_matrix=False, load_similarity_matrix=True
+        user_offer_matrix, compute_similarity_matrix=False, load_similarity_matrix=False
     )
     recs = cf_recommender.recommend(test_list, 3)
 
