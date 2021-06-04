@@ -8,6 +8,9 @@ This is a flask application that achieves the following:
 ## Link to app: 
 The application is now hosted [here](https://analytics-ab.herokuapp.com) using Heroku.
 
+![Screenshot 2021-06-04 at 17 41 10](https://user-images.githubusercontent.com/76539263/120835321-154d9080-c55c-11eb-956b-484419d75ba4.png)
+
+
 ## Running the app locally
 
 ### Clone the repository
