@@ -27,8 +27,7 @@ To install the flask app, you need:
  pip install -r requirements.txt
 ```
 
-## Running the app locally
-To run the app locally, execute the following line in the root folder of the repository
+To start the flask server, execute the following line in the root folder of the repository
 
 ``` 
  python run_local.py
